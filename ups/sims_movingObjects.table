@@ -1,0 +1,11 @@
+setupRequired(base)
+setupRequired(numpy)
+setupRequired(oorb)
+
+# other requirements (not in LSST stack)
+# both are supplied by Anaconda
+# scipy
+# sqlalchemy 
+
+envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+envPrepend(PATH, ${PRODUCT_DIR}/bin)
