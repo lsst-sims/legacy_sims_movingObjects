@@ -18,11 +18,11 @@ class Ephemerides(Orbits):
         # Set translation from timescale to OpenOrb numerical representation.
         # Note all orbits are assumed to be in TT timescale.
         # Also, all dates are expected to be in MJD.
-        self.timeScales = {'UTC':1, 'UT1':2, 'TT':3, 'TAI':4}
-        self.elemType = {'COM':2, 'KEP':3}
+        self.timeScales = {'UTC': 1, 'UT1': 2, 'TT': 3, 'TAI': 4}
+        self.elemType = {'COM': 2, 'KEP': 3}
 
         # Set up oorb. Call this once.
-        if ephfile == None:
+        if ephfile is None:
             ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
         oo.pyoorb.oorb_init(ephemeris_fname=ephfile)
 
@@ -145,7 +145,8 @@ class Ephemerides(Orbits):
         8 : phase angle (deg)
         9 : solar elongation angle (deg)
 
-        Here we convert to a numpy recarray, grouped either by object (default) or by time (if byObject=False).
+        Here we convert to a numpy recarray, grouped either by object (default)
+        or by time (if byObject=False).
         The resulting numpy recarray is a 3-d array with axes
         - if byObject = True : [object][ephemeris elements][@time]
         (i.e. the 'ra' column = 2-d array, where the [0] axis (length) equals the number of ephTimes)
@@ -173,6 +174,6 @@ class Ephemerides(Orbits):
         # Create a numpy recarray.
         ephs = np.rec.fromarrays([ephs[0], ephs[1], ephs[2], ephs[3], ephs[4],
                                   ephs[6], ephs[7], ephs[8], ephs[9], velocity],
-                                  names=['delta', 'ra', 'dec', 'magV', 'time', 'dradt',
-                                         'ddecdt', 'phase', 'solarelon','velocity'])
+                                 names=['delta', 'ra', 'dec', 'magV', 'time', 'dradt',
+                                        'ddecdt', 'phase', 'solarelon', 'velocity'])
         return ephs

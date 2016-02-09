@@ -31,7 +31,7 @@ class testEphemerides(unittest.TestCase):
             self.assertEqual(len(oorbElem), 1)
 
     def testConvertTimes(self):
-        times = np.arange(49353, 49353+10, 0.5)
+        times = np.arange(49353, 49353 + 10, 0.5)
         ephTimes = self.ephems.convertTimes(times, 'UTC')
         # Check that shape of ephTimes is correct.
         self.assertEqual(ephTimes.shape[0], len(times))
@@ -42,7 +42,7 @@ class testEphemerides(unittest.TestCase):
         self.assertEqual(ephTimes[0][1], 4)
 
     def testOorbEphemeris(self):
-        times = np.arange(49353, 49353+3, 0.25)
+        times = np.arange(49353, 49353 + 3, 0.25)
         ephTimes = self.ephems.convertTimes(times)
         oorbElem = self.ephems.convertOorbElem()
         oorbEphs = self.ephems.generateOorbEphs(oorbElem, ephTimes, obscode=807)
@@ -50,7 +50,7 @@ class testEphemerides(unittest.TestCase):
         self.assertEqual(oorbEphs.shape, (len(oorbElem), len(times), 10))
 
     def testEphemeris(self):
-        times = np.arange(49353, 49353+2, 0.3)
+        times = np.arange(49353, 49353 + 2, 0.3)
         ephTimes = self.ephems.convertTimes(times)
         oorbElem = self.ephems.convertOorbElem()
         oorbEphs = self.ephems.generateOorbEphs(oorbElem, ephTimes, obscode=807)
@@ -61,5 +61,3 @@ class testEphemerides(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
