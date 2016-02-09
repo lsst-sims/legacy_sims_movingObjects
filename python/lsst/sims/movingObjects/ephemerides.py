@@ -1,5 +1,6 @@
 import os
 from itertools import repeat
+import warnings
 import numpy as np
 import pandas as pd
 import pyoorb as oo
@@ -127,7 +128,7 @@ class PyOrbEphemerides(Orbits):
         oorbEphems, err = oo.pyoorb.oorb_ephemeris(in_orbits=oorbElem, in_obscode=obscode,
                                                    in_date_ephems=ephTimes)
         if err != 0:
-            print 'Oorb returned error %s' % (err)
+            warnings.warn('Oorb returned error %s' % (err))
         return oorbEphems
 
     def _convertOorbEphs(self, oorbEphs, byObject=True):
@@ -205,5 +206,25 @@ class PyOrbEphemerides(Orbits):
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
         return ephs
 
-    def propagateOrbits(self):
-        pass
+    def propagateOrbits(self, new_epoch, sso=None):
+        """Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
+
+        Parameters
+        ----------
+        new_epoch : float
+            MJD TT time for new epoch.
+        sso : pandas.Dataframe or pandas.Series or numpy.ndarray, optional
+            A single or set of rows from self.orbits. Default = None (uses all of self.orbits).
+
+        Returns
+        -------
+        PyOrbEphemerides
+            New PyOrbEphemerides object, containing updated orbital elements for orbits specified by 'sso'.
+        """
+        oorbElems = self.convertOorbElems(sso=sso)
+        new_epoch = self._convertTimes([newEpoch], timeScale='TT')
+        newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=oorbElems, in_epoch=new_epoch)
+        if err != 0:
+            warnings.warn('Orbit propagation returned error %d' % err)
+        # Unpack new orbital elements.
+        return newOorbElems
