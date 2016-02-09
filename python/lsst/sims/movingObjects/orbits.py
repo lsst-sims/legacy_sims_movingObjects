@@ -3,20 +3,28 @@ import warnings
 import numpy as np
 import pandas as pd
 
+__all__ = ['Orbits']
+
+
 class Orbits(object):
-    """Orbits stores orbit parameters for moving objects.
+    """Orbits reads and stores orbit parameters for moving objects.
     """
     def __init__(self):
         self.orbits = None
         self.nSso = 0
+        self.format = None
+
+        # Specify the required columns/values in the self.orbits dataframe.
+        # Which columns are required depends on self.format.
+        self.dataCols = {}
+        self.dataCols['COM'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
+                                'tPeri', 'epoch', 'H', 'g', 'sed_filename']
+        self.dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
+                                'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
 
     def readOrbits(self, orbitfile, delim=None, skiprows=None):
-        """Read orbits from a file, generating a pandas dataframe containing columns:
-
-        A set of orbital elements appropriate to generate ephemerides and LSST magnitudes with oorb, one of either:
-        'objID q(AU) e inc(deg) node(deg) argPeri(deg) tPeri(MJD TDT) epoch(MJD TDT) H g sed_filename' (COM format)
-        'objID q(AU) e inc(deg) node(deg) argPeri(deg) trueAnomaly(deg) epoch(MJD TDT) H g sed_filename' (COT format)
-        'objID a(AU) e inc(deg) node(deg) argPeri(deg) meanAnomaly(deg) epoch(MJD TDT) H g sed_filename' (KEP format)
+        """Read orbits from a file, generating a pandas dataframe containing columns matching
+        self.dataCols, for the appropriate orbital parameter format (currently accepts COM or KEP formats).
 
         If objid is not present in the input file, a sequential series of integers will be used.
         If H is not present in the input file, a default value of 20 will be used.
@@ -42,7 +50,8 @@ class Orbits(object):
         ssoCols = orbits.columns.values.tolist()
         self.nSso = len(orbits)
 
-        # These are the alternative possibilities for various column headers (depending on file version, origin, etc.)
+        # These are the alternative possibilities for various column headers
+        # (depending on file version, origin, etc.)
         # that might need remapping from the on-file values to our standardized values.
         altNames = {}
         altNames['objId'] = ['objId', 'objid', '!!ObjID', '!!OID', 'objid(int)', 'full_name', '# name']
@@ -50,36 +59,31 @@ class Orbits(object):
         altNames['a'] = ['a']
         altNames['e'] = ['e', 'ecc']
         altNames['inc'] = ['inc', 'i', 'i(deg)']
-        altNames['Omega'] = ['Omega', 'omega', 'node', 'om', 'node(deg)', 'BigOmega', 'Omega/node', 'longNode']
+        altNames['Omega'] = ['Omega', 'omega', 'node', 'om', 'node(deg)',
+                             'BigOmega', 'Omega/node', 'longNode']
         altNames['argPeri'] = ['argPeri', 'argperi', 'omega/argperi', 'w', 'argperi(deg)']
         altNames['tPeri'] = ['tPeri', 't_p', 'timeperi', 't_peri']
         altNames['epoch'] = ['epoch', 't_0', 'Epoch', 'epoch_mjd']
         altNames['H'] = ['H', 'magH', 'magHv', 'Hv', 'H_v']
         altNames['g'] = ['g', 'phaseV', 'phase', 'gV', 'phase_g']
         altNames['meanAnomaly'] = ['meanAnomaly', 'meanAnom', 'M', 'ma']
-        altNames['trueAnomaly'] = ['trueAnomaly', 'trueAnom']
+        altNames['sed_filename'] = ['sed_filename', 'sed']
+
         # Update column names that match any of the alternatives above.
         for name, alternatives in altNames.iteritems():
             intersection = list(set(alternatives) & set(ssoCols))
             if len(intersection) > 1:
-                raise ValueError('Received too many possible matches to %s in orbit file %s' % (name, orbitfile))
+                raise ValueError('Received too many possible matches to %s in orbit file %s'
+                                 % (name, orbitfile))
             if len(intersection) == 1:
                 idx = ssoCols.index(intersection[0])
                 ssoCols[idx] = name
         # Assign the new column names back to the orbits dataframe.
         orbits.columns = ssoCols
 
-        # These are the possible sets of orbital parameters and 'extras' that we need.
-        outCols = {}
-        outCols['COM'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri', 'tPeri', 'epoch', 'H', 'g', 'sed_filename']
-        outCols['COT'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri', 'trueAnomaly', 'epoch', 'H', 'g', 'sed_filename']
-        outCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri', 'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
         # Discover which type of orbital parameters we have on disk.
         if 'q' in orbits:
-            if 'trueAnomaly' in orbits:
-                self.format = 'COT'
-            else:
-                self.format = 'COM'
+            self.format = 'COM'
         elif 'a' in orbits:
             self.format = 'KEP'
         else:
@@ -97,9 +101,10 @@ class Orbits(object):
             orbits['sed_filename'] = np.array(sedvals)
 
         # Make sure we gave all the columns we need.
-        for col in outCols[self.format]:
+        for col in self.dataCols[self.format]:
             if col not in orbits:
-                raise ValueError('Missing required orbital element %s for orbital format type %s' % (col, self.format))
+                raise ValueError('Missing required orbital element %s for orbital format type %s'
+                                 % (col, self.format))
         # Check to see if we have duplicates.
         if len(orbits['objId'].unique()) != self.nSso:
             warnings.warn('There are duplicates in the orbit objID values - was this intended? (continuing).')
