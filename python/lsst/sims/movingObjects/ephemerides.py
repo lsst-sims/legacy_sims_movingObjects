@@ -5,15 +5,15 @@ import pandas as pd
 import pyoorb as oo
 from .orbits import Orbits
 
-__all__ = ['Ephemerides']
+__all__ = ['PyOrbEphemerides']
 
-class Ephemerides(Orbits):
-    """Generate ephemerides using the python interface to Oorb.
+class PyOrbEphemerides(Orbits):
+    """Generate ephemerides and propagate orbits using the python interface to Oorb.
     Inherits from Orbits and uses parent class to set orbital parameters.
     """
     def __init__(self, ephfile=None):
         # Call the parent init.
-        super(Ephemerides, self).__init__()
+        super(PyOrbEphemerides, self).__init__()
 
         # Set translation from timescale to OpenOrb numerical representation.
         # Note all orbits are assumed to be in TT timescale.
@@ -27,7 +27,8 @@ class Ephemerides(Orbits):
         oo.pyoorb.oorb_init(ephemeris_fname=ephfile)
 
     def convertOorbElem(self, sso=None):
-        """Convert orbital elements into the numpy fortran-format array OpenOrb requires as input.
+        """Convert orbital elements into the numpy fortran-format array OpenOrb requires
+        as input for ephemeris generation.
 
         The OpenOrb element format is a single array with elemenets:
         0 : orbitId (cannot be a string)
@@ -80,14 +81,14 @@ class Ephemerides(Orbits):
                                         np.radians(sso['Omega']), np.radians(sso['argPeri']),
                                         np.radians(sso['meanAnomaly']), elem_type, sso['epoch'], epoch_scale,
                                         sso['H'], sso['g']))
-        else:
+        else: # assume format = COM
             oorbElem = np.column_stack((orbids, sso['q'], sso['e'], np.radians(sso['inc']),
                                         np.radians(sso['Omega']), np.radians(sso['argPeri']),
                                         sso['tPeri'], elem_type, sso['epoch'], epoch_scale,
                                         sso['H'], sso['g']))
         return oorbElem
 
-    def convertTimes(self, times, timeScale='UTC'):
+    def _convertTimes(self, times, timeScale='UTC'):
         """Generate an oorb-format array of the times desired for the ephemeris generation.
 
         Parameters
@@ -106,7 +107,7 @@ class Ephemerides(Orbits):
                             dtype='double', order='F')
         return ephTimes
 
-    def generateOorbEphs(self, oorbElem, ephTimes, obscode=807):
+    def _generateOorbEphs(self, oorbElem, ephTimes, obscode=807):
         """Generate ephemerides using OOrb.
 
         Parameters
@@ -129,7 +130,7 @@ class Ephemerides(Orbits):
             print 'Oorb returned error %s' % (err)
         return oorbEphems
 
-    def convertOorbEphs(self, oorbEphs, byObject=True):
+    def _convertOorbEphs(self, oorbEphs, byObject=True):
         """Converts oorb ephemeris array to pandas dataframe, with labelled columns.
 
         The oorb ephemeris array is a 3-d array organized as: (object / times / eph@time)
@@ -177,3 +178,32 @@ class Ephemerides(Orbits):
                                  names=['delta', 'ra', 'dec', 'magV', 'time', 'dradt',
                                         'ddecdt', 'phase', 'solarelon', 'velocity'])
         return ephs
+
+
+    def generateEphemerides(self, oorbElem, times, timeScale='UTC', obscode=807, byObject=True):
+        """Convenience method wrapping self._convertTimes, self._generateOorbEphs and self._convertOorbEphs into one step.
+
+        Parameters
+        ----------
+        oorbElem : numpy.ndarray
+            Orbital elements converted to oorb format (see self.convertOorbElem)
+        ephtimes : numpy.ndarray
+            Ephemeris times in oorb format (see self.convertTimes)
+        obscode : int, optional
+            The observatory code for ephemeris generation. Default=807 (Cerro Tololo).
+         byObject : boolean, optional
+            If True (default), resulting converted ephemerides are grouped by object.
+            If False, resulting converted ephemerides are grouped by time.
+
+        Returns
+        -------
+        numpy.ndarray
+            The re-arranged ephemeris values, in a 3-d array.
+        """
+        ephTimes = self._convertTimes(times, timeScale=timeScale)
+        oorbEphs = self._generateOorbEphs(oorbElem, ephTimes, obscode=obscode)
+        ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
+        return ephs
+
+    def propagateOrbits(self):
+        pass
