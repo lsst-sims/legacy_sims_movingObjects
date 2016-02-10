@@ -24,7 +24,7 @@ class PyOrbEphemerides(object):
             ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
         oo.pyoorb.oorb_init(ephemeris_fname=ephfile)
 
-        self.orbits = None
+        self.orbitObj = None
         self.oorbElem = None
 
     def setOrbits(self, orbitObj):
