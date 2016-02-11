@@ -5,7 +5,6 @@ import pandas as pd
 
 __all__ = ['Orbits']
 
-
 class Orbits(object):
     """Orbits reads and stores orbit parameters for moving objects.
     """
@@ -13,6 +12,38 @@ class Orbits(object):
         self.orbits = None
         self.nSso = 0
         self.format = None
+
+    def __len__(self):
+        return self.nSso
+
+    def __getitem__(self, i):
+        orb = Orbits()
+        orb.setOrbits(self.orbits.query('index==@i'))
+        return orb
+
+    def __iter__(self):
+        self.idx = 0
+        return self
+
+    def next(self):
+        if self.idx >= self.nSso:
+            raise StopIteration
+        idx = self.idx
+        self.idx += 1
+        return self.__getitem__(idx)
+
+    def __eq__(self, otherOrbits):
+        if isinstance(otherOrbits, Orbits):
+            if self.orbits.equals(otherOrbits.orbits):
+                return True
+        else:
+            return False
+
+    def __neq__(self, otherOrbits):
+        if self == otherOrbits:
+            return False
+        else:
+            return True
 
     def setOrbits(self, orbits):
         """Set and validate orbital parameters contain all required values.
