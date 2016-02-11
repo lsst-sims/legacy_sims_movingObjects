@@ -30,16 +30,35 @@ class ChebyFits(object):
     The exact timestep and length of each timestep is adjusted so that the residuals in RA/Dec position
     are less than skyTolerance - default = 2.5mas.
 
+    Default values are based on Yusra AlSayaad's work.
+
     Parameters
     ----------
     skyTolerance : float, optional
         The desired tolerance in mas between ephemerides calculated by OpenOrb and fitted values.
         Default 2.5 mas.
+    coeff_position : int, optional
+        The number of Chebyshev coefficients to fit for the RA/Dec positions. Default 14.
+    coeff_vmag : int, optional
+        The number of Chebyshev coefficients to fit for the V magnitude values. Default 9.
+    coeff_delta : int, optional
+        The number of Chebyshev coefficients to fit for the distance between Earth/Object. Default 5.
+    coeff_elongation : int, optional
+        The number of Chebyshev coefficients to fit for the solar elongation. Default 5.
+    ngran : int, optional
+        The number of ephemeris points within each Chebyshev polynomial segment. Default 64.
     ephFile : str, optional
         The path to the JPL ephemeris file to use. Default is '$OORB_DATA/de405.dat'.
     """
-    def __init__(self, skyTolerance=2.5, ephFile=None):
+    def __init__(self, skyTolerance=2.5, coeff_position=14, coeff_vmag=9, coeff_delta=5,
+                 coeff_elongation=5, ngran=64, ephFile=None):
         self.skyTolerance = skyTolerance
+        self.coeff = {}
+        self.coeff['position'] = coeff_position
+        self.coeff['vmag'] = coeff_vmag
+        self.coeff['delta'] = coeff_delta
+        self.coeff['elongation'] = coeff_elongation
+        self.ngran = ngran
         if ephfile is None:
             ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
         self.pyephems = PyEphemerides(ephfile)
@@ -55,6 +74,7 @@ class ChebyFits(object):
         if not isinstance(orbitObj, Orbits):
             raise ValueError('Need to provide an Orbits object, to validate orbital parameters.')
         self.orbitObj = orbitObj
+        self.pyephems.setOrbits(self.orbitObj)
 
     def generateEphemerides(self, times, obscode=807, timeScale='TAI'):
         """Generate ephemerides using OpenOrb for all orbits.
@@ -71,7 +91,6 @@ class ChebyFits(object):
             The default value of TAI is appropriate for most fitting purposes.
             Using UTC will induce discontinuities where the leap seconds between TAI and UTC occur.
         """
-        self.pyephems.setOrbits(self.orbitObj)
         self.ephems = self.pyephems.generateEphemerides(times, obscode=obscode,
                                                         timeScale=timeScale, byObject=True)
 
@@ -95,7 +114,6 @@ class ChebyFits(object):
         distance_moved : float
             Distance moved across the sky, in degrees.
         """
-        self.ngran = 64
         if distance_moved < 0.8:
             self.timestep = 0.03125  # 1/32 day
         elif distance < 1.6:
@@ -114,7 +132,6 @@ class ChebyFits(object):
             self.timestep = 0.000244140625  # 1/4096 day
         else:  # fastest it can go
             self.timestep = 0.0001220703125  # 1/8192 day
-        self.ngran = 64
         self.length = self.ngran * self.timestep
 
     def _updateGranularity(self, p_resid, dec):
@@ -145,6 +162,23 @@ class ChebyFits(object):
             self.timestep = self.timestep/2.
             self.length = self.length/2.
 
-    def _calcCoeffs(self):
-        """Call chebyfit to calculate coefficient for a given axes of the ephemerides."""
-        pass
+    def precomputeMultipliers(self):
+        """Calculate multipliers for Chebyshev fitting.
+
+        Calculate these once, rather than for each segment.
+        """
+        # The weights and nPoints are predetermined here, based on Yusra's earlier work.
+        self.multipliers = {}
+        self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
+                                                           self.coeff['position'], weight=0.16)
+        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['vmag'])
+        self.multipliers['delta'] = cheb.makeChebMatrix(self.ngran + 1, self.coeff['delta'], weight=0.16)
+        self.multipliers['delta_x'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['delta'])
+        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['elongation'])
+
+    # Need to make a version of doOneRecursiveSegment, and think about 'controller' script.
+    # controller script would use one instance of this class, then set orbits (all objects)
+    # then propagate all orbits to the start of the interval (need to test this)
+    # then calculate default ephemerides over desired interval (default timestep)
+    # Then in doOneRecursiveSegment, if residuals are too high, can redo ephemerides for that object
+    # on a tighter grid and with shorter segment length (count how often this happens?)
