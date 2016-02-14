@@ -41,7 +41,7 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
 
     intervalBegin = np.float(interval[0])
     intervalEnd = np.float(interval[-1])
-    t = 2.*np.array(x, dtype=np.float64) - intervalBegin - intervalEnd
+    t = 2. * np.array(x, dtype=np.float64) - intervalBegin - intervalEnd
     t /= intervalEnd - intervalBegin
 
     y = 0.
@@ -50,8 +50,8 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
     y1 = t
     v0 = np.zeros_like(t)
     v1 = np.ones_like(t)
-    v2 = 4.*t
-    t = 2.*t
+    v2 = 4. * t
+    t = 2. * t
     N = len(p)
 
     if doVelocity:
@@ -61,28 +61,28 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
                 v1 = 0.
             j = min(i + 1, N - 1)
 
-            y += p[i]*y0 + p[j]*y1
-            v += p[i]*v0 + p[j]*v1
+            y += p[i] * y0 + p[j] * y1
+            v += p[i] * v0 + p[j] * v1
 
-            y2 = t*y1 - y0
-            y3 = t*y2 - y1
-            v2 = t*v1 - v0 + 2*y1
-            v3 = t*v2 - v1 + 2*y2
+            y2 = t * y1 - y0
+            y3 = t * y2 - y1
+            v2 = t * v1 - v0 + 2 * y1
+            v3 = t * v2 - v1 + 2 * y2
 
             y0 = y2
             y1 = y3
             v0 = v2
             v1 = v3
 
-        return y, 2*v/(intervalEnd - intervalBegin)
+        return y, 2 * v / (intervalEnd - intervalBegin)
     else:
         for i in np.arange(0, N, 2):
             if i == N - 1:
                 y1 = 0.
             j = min((i + 1), (N - 1))
-            y += p[i]*y0 + p[j]*y1
-            y0 = t*y1 - y0
-            y1 = t*y0 - y1
+            y += p[i] * y0 + p[j] * y1
+            y0 = t * y1 - y0
+            y1 = t * y0 - y1
 
         return y, None
 
@@ -139,11 +139,11 @@ def makeChebMatrix(nPoints, nPoly, weight=0.16):
     # make matrix T*W
     tw = np.zeros([nPoly, nPoints, 2])
     tw[:, :, 0] = tmat.transpose()
-    tw[:, :, 1] = tdot.transpose()*weight
+    tw[:, :, 1] = tdot.transpose() * weight
 
     # make matrix T*WT
     twt = np.dot(tw[:, :, 0], tmat) + np.dot(tw[:, :, 1], tdot)
-    tw = tw.reshape(nPoly, 2*nPoints)
+    tw = tw.reshape(nPoly, 2 * nPoints)
 
     # insert matrix T*W in matrix C2
     c2 = np.zeros([nPoly + 4, 2 * nPoints])
@@ -167,7 +167,7 @@ def makeChebMatrix(nPoints, nPoly, weight=0.16):
     c1c2 = np.dot(c1inv, c2)
     c1c2 = c1c2.reshape(nPoly + 4, nPoints, 2)
     c1c2 = c1c2[:, ::-1, :]
-    c1c2 = c1c2.reshape(nPoly + 4, 2*nPoints)
+    c1c2 = c1c2.reshape(nPoly + 4, 2 * nPoints)
 
     # separate even rows for x, and odd rows for dx/dt
     return c1c2[0:nPoly, 0::2], c1c2[0:nPoly, 1::2]
@@ -283,7 +283,7 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
             raise RuntimeError('Without velocity constraints, nPoly must be greater than 2')
     else:
         if nPoly >= 2 * (nPoints + 1):
-            raise RuntimeError('nPoly must be less than %s' % (2*(nPoints + 1)))
+            raise RuntimeError('nPoly must be less than %s' % (2 * (nPoints + 1)))
         if nPoly < 4:
             raise RuntimeError('nPoly must be greater than 4')
 
@@ -318,18 +318,15 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
     # Compute statistics
     # for x and dxdt if it is available
     if dxdt is not None:
-        a_n = a_n + np.dot(dxMultiplier, dxdt*(tInterval[1] - tInterval[0])/2.)
+        a_n = a_n + np.dot(dxMultiplier, dxdt * (tInterval[1] - tInterval[0]) / 2.)
         xApprox, dxApprox = chebeval(tScaled, a_n, interval=tInterval)
-        dresiduals = dxdt - dxApprox
-        dse = np.sum(dresiduals**2)
-        drms = np.sqrt(dse/(nPoints - 1))
     else:
         # Statistics for x only
         xApprox, _ = chebeval(tScaled, a_n, interval=tInterval, doVelocity=False)
 
     residuals = x - xApprox
     se = np.sum(residuals**2)
-    rms = np.sqrt(se/(nPoints - 1))
+    rms = np.sqrt(se / (nPoints - 1))
     maxresid = np.max(np.abs(residuals))
 
     return a_n, residuals, rms, maxresid

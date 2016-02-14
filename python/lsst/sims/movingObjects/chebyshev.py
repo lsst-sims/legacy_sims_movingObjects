@@ -34,6 +34,16 @@ class ChebyFits(object):
 
     Parameters
     ----------
+    orbits : Orbits
+        The orbits for which to fit chebyshev polynomial coefficients.
+    tStart : float
+        The starting point in time to fit coefficients. MJD.
+    tEnd : float
+        The end point in time to fit coefficients. MJD.
+    timeScale : {'TAI', 'UTC', 'TT'}
+        The timescale of the MJD times, tStart/tEnd, and the time that should be used with the chebyshev coefficients.
+    obsCode : int, optional
+        The observatory code of the location for which to generate ephemerides. Default 807 (CTIO).
     skyTolerance : float, optional
         The desired tolerance in mas between ephemerides calculated by OpenOrb and fitted values.
         Default 2.5 mas.
@@ -50,8 +60,22 @@ class ChebyFits(object):
     ephFile : str, optional
         The path to the JPL ephemeris file to use. Default is '$OORB_DATA/de405.dat'.
     """
-    def __init__(self, skyTolerance=2.5, coeff_position=14, coeff_vmag=9, coeff_delta=5,
+    def __init__(self, orbits, tStart, tEnd, timeScale='TAI',
+                 obsCode=807, skyTolerance=2.5, coeff_position=14, coeff_vmag=9, coeff_delta=5,
                  coeff_elongation=5, ngran=64, ephFile=None):
+        self._setOrbits(orbits)
+        self.tStart = tStart
+        self.tEnd = tEnd
+        if timeScale.upper() == 'TAI':
+            self.timeScale = 'TAI'
+        elif timeScale.upper() == 'UTC':
+            self.timeScale = 'UTC'
+        elif timeScale.upper() == 'TT':
+            self.timeScale = 'TT'
+        else:
+            raise ValueError('Do not understand timeScale; use TAI, UTC or TT.')
+        self.tDays = (self.tEnd - self.tStart)
+        self.obsCode = obsCode
         self.skyTolerance = skyTolerance
         self.coeff = {}
         self.coeff['position'] = coeff_position
@@ -63,7 +87,7 @@ class ChebyFits(object):
             ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
         self.pyephems = PyEphemerides(ephfile)
 
-    def setOrbits(self, orbitObj):
+    def _setOrbits(self, orbitObj):
         """Set the orbits, to be used to generate ephemerides.
 
         Parameters
@@ -72,11 +96,18 @@ class ChebyFits(object):
            The orbits to use to generate ephemerides.
         """
         if not isinstance(orbitObj, Orbits):
-            raise ValueError('Need to provide an Orbits object, to validate orbital parameters.')
+            raise ValueError('Need to provide an Orbits object.')
         self.orbitObj = orbitObj
         self.pyephems.setOrbits(self.orbitObj)
 
-    def generateEphemerides(self, times, obscode=807, timeScale='TAI'):
+    def propagateOrbits(self, newEpoch):
+        """Not working yet -- pyoorb problem."""
+        raise NotImplementedError
+        """
+        self.pyephems.propagateOrbits(newEpoch)
+        """
+
+    def generateEphemerides(self, times):
         """Generate ephemerides using OpenOrb for all orbits.
 
         Saves the resulting ephemerides in self.ephems.
@@ -85,14 +116,22 @@ class ChebyFits(object):
         ----------
         times : numpy.ndarray
             The times to use for ephemeris generation.
-        obscode : int
-            The observatory code for ephemeris generation. Default is 807, CTIO/approximate LSST.
-        timeScale : str, optional
-            The default value of TAI is appropriate for most fitting purposes.
-            Using UTC will induce discontinuities where the leap seconds between TAI and UTC occur.
         """
-        self.ephems = self.pyephems.generateEphemerides(times, obscode=obscode,
-                                                        timeScale=timeScale, byObject=True)
+        return self.pyephems.generateEphemerides(times, obscode=self.obscode, timeScale=self.timeScale, byObject=True)
+
+    def precomputeMultipliers(self):
+        """Calculate multipliers for Chebyshev fitting.
+
+        Calculate these once, rather than for each segment.
+        """
+        # The weights and nPoints are predetermined here, based on Yusra's earlier work.
+        self.multipliers = {}
+        self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
+                                                           self.coeff['position'], weight=0.16)
+        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['vmag'])
+        self.multipliers['delta'] = cheb.makeChebMatrix(self.ngran + 1, self.coeff['delta'], weight=0.16)
+        self.multipliers['delta_x'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['delta'])
+        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['elongation'])
 
     def _setGranularity(self, distance_moved):
         """
@@ -162,20 +201,22 @@ class ChebyFits(object):
             self.timestep = self.timestep/2.
             self.length = self.length/2.
 
-    def precomputeMultipliers(self):
-        """Calculate multipliers for Chebyshev fitting.
-
-        Calculate these once, rather than for each segment.
+    def calcGranularity(self):
+        """Set the typical timestep and segment length for all objects between tStart/tEnd.
         """
-        # The weights and nPoints are predetermined here, based on Yusra's earlier work.
-        self.multipliers = {}
-        self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
-                                                           self.coeff['position'], weight=0.16)
-        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['vmag'])
-        self.multipliers['delta'] = cheb.makeChebMatrix(self.ngran + 1, self.coeff['delta'], weight=0.16)
-        self.multipliers['delta_x'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['delta'])
-        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['elongation'])
+        # Generate ephemerides for 1 day, at the midpoint.
+        midPoint = self.tStart + self.tDays / 2.0
+        times = np.array([midPoint, midPoint+1.0])
+        ephs = self.pyephems.generateEphemerides(times, obscode=self.obscode, timeScale=self.timeScale, byObject=False)
+        # Calculate the distances that each of these objects moved over a day.
+        distances = haversine(np.radians(ephs['ra'][1]), np.radians(ephs['ra'][0]),
+                              np.radians(ephs['dec'][1]), np.radians(ephs['dec'][0]))
+        distances = np.degrees(distances)
+        # Choose the (average? highest 75%? max?) distance.
 
+
+    def doOneRecursiveSegment(self):
+        pass
     # Need to make a version of doOneRecursiveSegment, and think about 'controller' script.
     # controller script would use one instance of this class, then set orbits (all objects)
     # then propagate all orbits to the start of the interval (need to test this)
