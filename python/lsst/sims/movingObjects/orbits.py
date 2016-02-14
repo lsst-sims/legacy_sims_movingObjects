@@ -21,7 +21,6 @@ class Orbits(object):
         self.dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
                                 'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
 
-
     def __len__(self):
         return self.nSso
 

@@ -212,7 +212,6 @@ class PyOrbEphemerides(object):
                                         'ddecdt', 'phase', 'solarelon', 'velocity'])
         return ephs
 
-
     def generateEphemerides(self, times, timeScale='UTC', obscode=807, byObject=True):
         """Calculate ephemerides for all orbits at times `times`.
 
@@ -250,7 +249,7 @@ class PyOrbEphemerides(object):
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
         return ephs
 
-    def propagateOrbits(self, new_epoch):
+    def propagateOrbits(self, newEpoch):
         """Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
 
         Parameters
@@ -265,9 +264,8 @@ class PyOrbEphemerides(object):
         PyOrbEphemerides
             New PyOrbEphemerides object, containing updated orbital elements for orbits specified by 'sso'.
         """
-        oorbElems = self.convertOorbElems(sso=sso)
-        new_epoch = self._convertTimes([newEpoch], timeScale='TT')
-        newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=oorbElems, in_epoch=new_epoch)
+        newEpoch = self._convertTimes([newEpoch], timeScale='TT')
+        newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElems, in_epoch=newEpoch)
         if err != 0:
             warnings.warn('Orbit propagation returned error %d' % err)
         # Convert new orbital elements to normal form, and return new Orbits instance.

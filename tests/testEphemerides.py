@@ -93,7 +93,7 @@ class testPyOrbEphemerides(unittest.TestCase):
             np.testing.assert_almost_equal(ephs[column], ephsA[column])
         # And test all-wrapped-up method:
         ephsAllA = self.ephems.generateEphemerides(times, obscode=807,
-                                                  timeScale='UTC', byObject=False)
+                                                   timeScale='UTC', byObject=False)
         np.testing.assert_equal(ephsAllA, ephsA)
         for column in ephsAll.dtype.names:
             np.testing.assert_almost_equal(ephsAllA[column], ephsAll[column])
