@@ -4,6 +4,21 @@ from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 
 class testOrbits(unittest.TestCase):
+    def testBuiltIns(self):
+        orbits = Orbits()
+        orbits.readOrbits('test_orbitsQ.des')
+        self.assertEqual(len(orbits), 4)
+        orbits2 = Orbits()
+        orbits2.readOrbits('test_orbitsQ.des')
+        self.assertEqual(orbits, orbits2)
+        orbits3 = Orbits()
+        orbits.readOrbits('test_orbitsA.des')
+        self.assertNotEqual(orbits, orbits3)
+        orbits3 = orbits[0]
+        assert_frame_equal(orbits3.orbits, orbits.orbits.head(1))
+        for orb, (i, orbi) in zip(orbits, orbits.orbits.iterrows()):
+            self.assertEqual(orb.orbits['objId'].values[0], orbi['objId'])
+
     def testReadOrbits(self):
         orbits = Orbits()
         orbits.readOrbits('test_orbitsQ.des')

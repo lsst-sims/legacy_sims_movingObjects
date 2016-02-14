@@ -40,6 +40,12 @@ class testPyOrbEphemerides(unittest.TestCase):
         self.assertEqual(self.ephems.oorbElem[0][7], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsA.orbits['a'][0])
 
+    def testConvertFromOorbArray(self):
+        self.ephems.orbitObj = self.orbits
+        self.ephems._convertOorbElem()
+        newOrbits = self.ephems._convertFromOorbElem(self.ephems.oorbElem)
+        self.assertEqual(newOrbits, self.orbits)
+
     def testConvertTimes(self):
         times = np.arange(49353, 49353 + 10, 0.5)
         ephTimes = self.ephems._convertTimes(times, 'UTC')

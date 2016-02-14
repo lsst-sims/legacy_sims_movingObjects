@@ -13,6 +13,15 @@ class Orbits(object):
         self.nSso = 0
         self.format = None
 
+        # Specify the required columns/values in the self.orbits dataframe.
+        # Which columns are required depends on self.format.
+        self.dataCols = {}
+        self.dataCols['COM'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
+                                'tPeri', 'epoch', 'H', 'g', 'sed_filename']
+        self.dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
+                                'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
+
+
     def __len__(self):
         return self.nSso
 
@@ -34,8 +43,11 @@ class Orbits(object):
 
     def __eq__(self, otherOrbits):
         if isinstance(otherOrbits, Orbits):
-            if self.orbits.equals(otherOrbits.orbits):
-                return True
+            for col in self.dataCols[self.format]:
+                if not self.orbits[col].equals(otherOrbits.orbits[col]):
+                    return False
+                else:
+                    return True
         else:
             return False
 
@@ -75,21 +87,21 @@ class Orbits(object):
 
         self.nSso = len(orbits)
 
-        # Specify the required columns/values in the self.orbits dataframe.
-        # Which columns are required depends on self.format.
-        dataCols = {}
-        dataCols['COM'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
-                           'tPeri', 'epoch', 'H', 'g', 'sed_filename']
-        dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
-                           'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
-
         # Discover which type of orbital parameters we have on disk.
+        format = None
+        if 'FORMAT' in orbits:
+            format = orbits['FORMAT'].iloc[0]
+            del orbits['FORMAT']
         if 'q' in orbits:
             self.format = 'COM'
         elif 'a' in orbits:
             self.format = 'KEP'
         else:
             raise ValueError('Cannot determine orbital type - neither q nor a in input orbital elements')
+        # Report a warning if formats don't seem to match.
+        if (format is not None) and (format != self.format):
+            warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
+                          "Using %s" % (format, self.format, self.format))
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
@@ -103,10 +115,11 @@ class Orbits(object):
             orbits['sed_filename'] = np.array(sedvals)
 
         # Make sure we gave all the columns we need.
-        for col in dataCols[self.format]:
+        for col in self.dataCols[self.format]:
             if col not in orbits:
                 raise ValueError('Missing required orbital element %s for orbital format type %s'
                                  % (col, self.format))
+
         # Check to see if we have duplicates.
         if len(np.unique(orbits['objId'])) != self.nSso:
             warnings.warn('There are duplicates in the orbit objId values' +
@@ -119,7 +132,7 @@ class Orbits(object):
         dataCols, for the appropriate orbital parameter format (currently accepts COM or KEP formats).
 
         After reading and standardizing the column names, calls self.setOrbits to validate the
-        orbital parameters.
+        orbital parameters. Expects angles in orbital element formats to be in degrees.
 
         Parameters
         ----------
@@ -135,6 +148,17 @@ class Orbits(object):
             orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=skiprows)
         else:
             orbits = pd.read_table(orbitfile, sep=delim, skiprows=skiprows)
+
+        # Drop some columns that are typically present in DES files but that we don't need.
+        if 'INDEX' in orbits:
+            del orbits['INDEX']
+        if 'N_PAR' in orbits:
+            del orbits['N_PAR']
+        if 'MOID' in orbits:
+            del orbits['MOID']
+        if 'COMPCODE' in orbits:
+            del orbits['COMPCODE']
+
         # Normalize the column names to standard values and identify the orbital element types.
         ssoCols = orbits.columns.values.tolist()
 
