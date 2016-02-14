@@ -80,6 +80,41 @@ class PyOrbEphemerides(object):
                                         self.orbitObj.orbits['H'], self.orbitObj.orbits['g']))
         self.oorbElem = oorbElem
 
+    def _convertFromOorbElem(self, oorbElem):
+        """Translate pyoorb-style orbital element array back into dataframe.
+
+        Parameters
+        ----------
+        oorbElem : numpy.ndarray
+            The orbital elements in OpenOrb format.
+
+        Returns
+        -------
+        Orbits
+            A new Orbits instance, containing the propagated orbits.
+        """
+        if self.orbitObj.format == 'KEP':
+            newOrbits = pd.DataFrame(self.oorbElem, columns=['objId', 'a', 'e', 'i', 'Omega', 'argperi',
+                                                            'meanAnomaly', 'elem_type', 'epoch', 'epoch_type',
+                                                            'H', 'g'])
+            newOrbits['meanAnomaly'] = np.degrees(newOrbits['argPeri'])
+        else:
+            newOrbits = pd.DataFrame(self.oorbElem, columns=['objId', 'q', 'e', 'i', 'Omega', 'argperi',
+                                                            'tPeri', 'elem_type', 'epoch', 'epoch_type',
+                                                            'H', 'g'])
+        # Convert from radians to degrees.
+        newOrbits['i'] = np.degrees(newOrbits['i'])
+        newOrbits['Omega'] = np.degrees(newOrbits['Omega'])
+        newOrbits['argPeri'] = np.degrees(newOrbits['argPeri'])
+        # Drop columns we don't need and don't include in our standard columns.
+        del newOrbits['elem_type']
+        del newOrbits['epoch_type']
+        # Swap orbit ids back to original values.
+        newOrbits['objId'] = self.orbits['objId'].as_matrix()
+        newOrbits['sed_filename'] = self.orbits['sed_filename'].as_matrix()
+        # Don't overwrite orbits.
+        return newOrbits
+
     def _convertTimes(self, times, timeScale='UTC'):
         """Generate an oorb-format array of the times desired for the ephemeris generation.
 
@@ -138,10 +173,11 @@ class PyOrbEphemerides(object):
 
         Here we convert to a numpy recarray, grouped either by object (default)
         or by time (if byObject=False).
-        The resulting numpy recarray is a 3-d array with axes
-        - if byObject = True : [object][ephemeris elements][@time]
+        The resulting numpy recarray is composed of columns (of each ephemeris element),
+        where each column is 2-d array with first axes either 'object' or 'time'.
+        - if byObject = True : [ephemeris elements][object][time]
         (i.e. the 'ra' column = 2-d array, where the [0] axis (length) equals the number of ephTimes)
-        - if byObject = False : [time][ephemeris elements][@object]
+        - if byObject = False : [ephemeris elements][time][object]
         (i.e. the 'ra' column = 2-d arrays, where the [0] axis (length) equals the number of objects)
 
         Parameters
@@ -176,10 +212,10 @@ class PyOrbEphemerides(object):
         This is a public method, wrapping self._convertTimes, self._generateOorbEphs
         and self._convertOorbEphs (which include dealing with oorb-formatting of arrays).
 
-        The return ephemerides are in a 3-d numpy recarray, with axes:
-        - if byObject = True : [object][ephemeris values][@time]
+        The return ephemerides are in a numpy recarray, with axes
+        - if byObject = True : [ephemeris values][object][@time]
         (i.e. the 'ra' column = 2-d array, where the [0] axis (length) equals the number of ephTimes)
-        - if byObject = False : [time][ephemeris values][@object]
+        - if byObject = False : [ephemeris values][time][@object]
         (i.e. the 'ra' column = 2-d arrays, where the [0] axis (length) equals the number of objects)
 
         The ephemeris values returned to the user (== columns of the recarray) are:
@@ -227,5 +263,7 @@ class PyOrbEphemerides(object):
         newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=oorbElems, in_epoch=new_epoch)
         if err != 0:
             warnings.warn('Orbit propagation returned error %d' % err)
-        # Unpack new orbital elements.
-        return newOorbElems
+        # Convert new orbital elements to normal form, and return new Orbits instance.
+        newOrbits = Orbits()
+        newOrbits.setOrbits(self._convertFromOorbElem(newOorbElems))
+        return newOrbits
