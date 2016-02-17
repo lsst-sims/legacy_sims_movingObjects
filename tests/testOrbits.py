@@ -1,18 +1,22 @@
 import unittest
+import os
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 
-class testOrbits(unittest.TestCase):
+class TestOrbits(unittest.TestCase):
+    def setUp(self):
+        self.testdir = 'testOrbits'
+
     def testBuiltIns(self):
         orbits = Orbits()
-        orbits.readOrbits('test_orbitsQ.des')
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.assertEqual(len(orbits), 4)
         orbits2 = Orbits()
-        orbits2.readOrbits('test_orbitsQ.des')
+        orbits2.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.assertEqual(orbits, orbits2)
         orbits3 = Orbits()
-        orbits.readOrbits('test_orbitsA.des')
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.assertNotEqual(orbits, orbits3)
         orbits3 = orbits[0]
         assert_frame_equal(orbits3.orbits, orbits.orbits.head(1))
@@ -21,16 +25,16 @@ class testOrbits(unittest.TestCase):
 
     def testReadOrbits(self):
         orbits = Orbits()
-        orbits.readOrbits('test_orbitsQ.des')
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.assertEqual(orbits.nSso, 4)
-        orbits.readOrbits('test_orbitsA.des')
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.assertEqual(orbits.nSso, 4)
         with self.assertRaises(ValueError):
-            orbits.readOrbits('test_orbitsBad.des')
+            orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsBad.des'))
 
     def testSetOrbits(self):
         orbits = Orbits()
-        orbits.readOrbits('test_orbitsQ.des')
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         # Test that we can set the orbits using a dataframe.
         suborbits = orbits.orbits.head(1)
         newOrbits = Orbits()
