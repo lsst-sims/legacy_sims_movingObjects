@@ -1,13 +1,12 @@
 import os
 import numpy as np
-from lsst.sims.utils import haversine
-import .chebyshevUtils as cheb
+import chebyshevUtils as cheb
 from .orbits import Orbits
-from .ephemerides import PyEphemerides
+from .ephemerides import PyOrbEphemerides
 
 __all__ = ['ChebyFits']
 
-def v_three_sixy_to_neg(element, min, max):
+def three_sixy_to_neg(element, min, max):
     if (min < 100) & (max > 270):
         if element > 270:
             return element - 360.
@@ -41,7 +40,8 @@ class ChebyFits(object):
     tEnd : float
         The end point in time to fit coefficients. MJD.
     timeScale : {'TAI', 'UTC', 'TT'}
-        The timescale of the MJD times, tStart/tEnd, and the time that should be used with the chebyshev coefficients.
+        The timescale of the MJD times, tStart/tEnd, and the timeScale that should be
+        used with the chebyshev coefficients.
     obsCode : int, optional
         The observatory code of the location for which to generate ephemerides. Default 807 (CTIO).
     skyTolerance : float, optional
@@ -60,12 +60,20 @@ class ChebyFits(object):
     ephFile : str, optional
         The path to the JPL ephemeris file to use. Default is '$OORB_DATA/de405.dat'.
     """
-    def __init__(self, orbits, tStart, tEnd, timeScale='TAI',
-                 obsCode=807, skyTolerance=2.5, coeff_position=14, coeff_vmag=9, coeff_delta=5,
-                 coeff_elongation=5, ngran=64, ephFile=None):
-        self._setOrbits(orbits)
+    def __init__(self, orbitObj, tStart, tEnd, timeScale='TAI',
+                 obscode=807, skyTolerance=2.5,
+                 nCoeff_position=14, nCoeff_vmag=9, nCoeff_delta=5,
+                 nCoeff_elongation=5, ngran=128, ephFile=None):
+        # Set up PyOrbEphemerides.
+        if ephFile is None:
+            ephFile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
+        self.pyephems = PyOrbEphemerides(ephFile)
+        # And then set orbits.
+        self._setOrbits(orbitObj)
+        # Save input parameters.
         self.tStart = tStart
         self.tEnd = tEnd
+        self.midPoint = self.tStart + (self.tEnd - self.tStart)/2.0
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
         elif timeScale.upper() == 'UTC':
@@ -74,18 +82,16 @@ class ChebyFits(object):
             self.timeScale = 'TT'
         else:
             raise ValueError('Do not understand timeScale; use TAI, UTC or TT.')
-        self.tDays = (self.tEnd - self.tStart)
-        self.obsCode = obsCode
+        self.obscode = obscode
         self.skyTolerance = skyTolerance
-        self.coeff = {}
-        self.coeff['position'] = coeff_position
-        self.coeff['vmag'] = coeff_vmag
-        self.coeff['delta'] = coeff_delta
-        self.coeff['elongation'] = coeff_elongation
+        self.nCoeff = {}
+        self.nCoeff['position'] = nCoeff_position
+        self.nCoeff['vmag'] = nCoeff_vmag
+        self.nCoeff['delta'] = nCoeff_delta
+        self.nCoeff['elongation'] = nCoeff_elongation
         self.ngran = ngran
-        if ephfile is None:
-            ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
-        self.pyephems = PyEphemerides(ephfile)
+        # Precompute multipliers (we only do this once, instead of per segment).
+        self._precomputeMultipliers()
 
     def _setOrbits(self, orbitObj):
         """Set the orbits, to be used to generate ephemerides.
@@ -100,26 +106,7 @@ class ChebyFits(object):
         self.orbitObj = orbitObj
         self.pyephems.setOrbits(self.orbitObj)
 
-    def propagateOrbits(self, newEpoch):
-        """Not working yet -- pyoorb problem."""
-        raise NotImplementedError
-        """
-        self.pyephems.propagateOrbits(newEpoch)
-        """
-
-    def generateEphemerides(self, times):
-        """Generate ephemerides using OpenOrb for all orbits.
-
-        Saves the resulting ephemerides in self.ephems.
-
-        Parameters
-        ----------
-        times : numpy.ndarray
-            The times to use for ephemeris generation.
-        """
-        return self.pyephems.generateEphemerides(times, obscode=self.obscode, timeScale=self.timeScale, byObject=True)
-
-    def precomputeMultipliers(self):
+    def _precomputeMultipliers(self):
         """Calculate multipliers for Chebyshev fitting.
 
         Calculate these once, rather than for each segment.
@@ -127,94 +114,194 @@ class ChebyFits(object):
         # The weights and nPoints are predetermined here, based on Yusra's earlier work.
         self.multipliers = {}
         self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
-                                                           self.coeff['position'], weight=0.16)
-        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['vmag'])
-        self.multipliers['delta'] = cheb.makeChebMatrix(self.ngran + 1, self.coeff['delta'], weight=0.16)
-        self.multipliers['delta_x'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['delta'])
-        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.coeff['elongation'])
+                                                           self.nCoeff['position'], weight=0.16)
+        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
+        self.multipliers['delta'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
+        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
 
-    def _setGranularity(self, distance_moved):
+    def propagateOrbits(self, newEpoch):
+        """Not working yet -- pyoorb problem."""
+        raise NotImplementedError
         """
-        Set the first pass values for timestep (for generating ephemerides) and chebyshev segment length.
+        self.pyephems.propagateOrbits(newEpoch)
+        """
 
-        If distance is:
-        < 0.8 degrees/day  treat same as MBA
-        < 1.6 degrees/day  try gen 1 day at 64 points per day.
-        < 3.2 deg/day      try gen 0.5 day at 128 points per day
-        < 6.4 deg/day       try gen 0.25 day at 256 points per day
-        < 12.8 deg.day     try gen 0.125 day at 512 points per day
-        < 25.6 deg/day     try gen 0.0625 day at 1024 points per day
-        < 51.2 deg/day     try gen 0.03125 day at 2048 points per day
-        > try gen 0.015625 day at 4096 points per day
-        ngran = 64 always, ngran = int(range/timestep)
+    def generateEphemerides(self, times, byObject=True):
+        """Generate ephemerides using OpenOrb for all orbits.
 
         Parameters
         ----------
-        distance_moved : float
-            Distance moved across the sky, in degrees.
+        times : numpy.ndarray
+            The times to use for ephemeris generation.
         """
-        if distance_moved < 0.8:
-            self.timestep = 0.03125  # 1/32 day
-        elif distance < 1.6:
-            self.timestep = 0.015625  # 1/64 day
-        elif distance < 3.2:
-            self.timestep = 0.0078125  # 1/128 day
-        elif distance < 6.4:
-            self.timestep = 0.00390625  # 1/256 day
-        elif distance < 12.8:
-            self.timestep = 0.001953125  # 1/512 day
-        elif distance < 25.6:
-            self.timestep = 0.0009765625  # 1/1024 day
-        elif distance < 51.2:
-            self.timestep = 0.00048828125  # 1/2048 day
-        elif distance < 102.4:
-            self.timestep = 0.000244140625  # 1/4096 day
-        else:  # fastest it can go
-            self.timestep = 0.0001220703125  # 1/8192 day
-        self.length = self.ngran * self.timestep
+        return self.pyephems.generateEphemerides(times, obscode=self.obscode,
+                                                 timeScale=self.timeScale, byObject=byObject)
 
-    def _updateGranularity(self, p_resid, dec):
-        """Update the granularity if the residuals in the position are beyond the tolerance.
-
-        Parameters
-        ----------
-        p_resid : float
-            Maximum positional residual, mas.
-        dec : float
-            Declination of the object, deg.
+    def _testResiduals(self, length, cutoff=85):
+        """Calculate the position residual, for a test case.
         """
-        factor = 1.
-        if p_resid > 1000:
-            factor = 16.
-        elif p_resid > 100:
-            factor = 8.
-        elif p_resid > 15:
-            factor = 6.
-        elif p_resid > 5:
-            factor = 4.
-        elif p_resid > 2:
-            factor = 2.
-        self.timestep = self.timestep / factor
-        self.length = self.length / factor
-        # cut it in half once more if chance to go over poles
-        if dec < -75. or dec > 75.:
-            self.timestep = self.timestep/2.
-            self.length = self.length/2.
+        # The pos_resid used will be the 'cutoff' percentile of all max residuals per object.
+        max_pos_resids = np.zeros(len(self.orbitObj), float)
+        timestep = length / float(self.ngran)
+        # Test for one segment at the midpoint.
+        times = np.arange(self.midPoint, self.midPoint + length + timestep / 2.0, timestep)
+        ephs = self.generateEphemerides(times, byObject=True)
+        for i, e in enumerate(ephs):
+            coeff_ra, coeff_dec, max_pos_resids[i] = self._getCoeffsPosition(times, e)
+        pos_resid = np.percentile(max_pos_resids, cutoff)
+        ratio = pos_resid / self.skyTolerance
+        return pos_resid, ratio
 
-    def calcGranularity(self):
+    def calcGranularity(self, length=None):
         """Set the typical timestep and segment length for all objects between tStart/tEnd.
+
+        Sets self.length and self.timestep, (length / timestep = self.ngran)
+
+        Parameters
+        ----------
+        length : float, optional
+            If specified, the length and timestep given by 'length' (plus self.ngran) is
+            used, instead of calculating it here.
         """
-        # Generate ephemerides for 1 day, at the midpoint.
-        midPoint = self.tStart + self.tDays / 2.0
-        times = np.array([midPoint, midPoint+1.0])
-        ephs = self.pyephems.generateEphemerides(times, obscode=self.obscode, timeScale=self.timeScale, byObject=False)
-        # Calculate the distances that each of these objects moved over a day.
-        distances = haversine(np.radians(ephs['ra'][1]), np.radians(ephs['ra'][0]),
-                              np.radians(ephs['dec'][1]), np.radians(ephs['dec'][0]))
-        distances = np.degrees(distances)
-        # Choose the (average? highest 75%? max?) distance.
+        # If length is specified, use it and do nothing else.
+        if length is not None:
+            self.length = length
+            self.timestep = self.length / float(self.ngran)
+            return
+        # Otherwise, calculate an appropriate length and timestep.
+        # Give a guess at a very approximate segment length, given the skyTolerance,
+        # purposefully trying to overestimate this value.
+        # The actual behavior of the residuals is not linear with segment length.
+        # There is a linear increase at low residuals < ~2 mas / segment length < 2 days
+        # Then at around 2 days the residuals blow up, increasing rapidly to about 5000 mas
+        #   (depending on orbit .. TNOs, for example, increase but only to about 300 mas,
+        #    when the residuals resume ~linear growth out to 70 day segments if ngran=128)
+        # Make an arbitrary cap on segment length at 60 days, (25000 mas) ~.5 arcminute accuracy.
+        maxLength = 60
+        maxIterations = 100
+        if self.skyTolerance < 5:
+            length = 2.0
+        elif self.skyTolerance >= 5000:
+            # Super approximate guess.
+            length = np.round((5000.0 / 20.0) * (self.skyTolerance - 5000.)) + 5.0
+            length = np.min([maxLength, length])
+        else:
+            # Try to pick a length somewhere in the middle of the fast increase.
+            length = 4.0
+        # Check the resulting residuals.
+        pos_resid, ratio = self._testResiduals(length)
+        counter = 1
+        """
+        print 'first try', counter, length, pos_resid, ratio
+        # Do a fast increase / decrease, stopping if we make things much worse.
+        # Seems like this may hardly ever get used.
+        while ((ratio > 4) or (ratio < 0.25)) and (length <= maxLength):
+            prev_length = length
+            prev_ratio = ratio
+            prev_pos_resid = pos_resid
+            length = prev_length / prev_ratio * 4.0
+            pos_resid, ratio = self._testResiduals(length)
+            counter += 1
+            if (((ratio / prev_ratio > 2) and ratio > 1) or
+                ((ratio / prev_ratio < 0.5) and ratio < 1)):
+                # Did we overcorrect?
+                print 'going back', counter, length, pos_resid, ratio, prev_ratio
+                length = prev_length
+                pos_resid = prev_pos_resid
+                break
+            print 'fast change', counter, length, pos_resid, ratio, prev_ratio
+        if length > maxLength and pos_resid > self.skyTolerance:
+            length = maxLength
+        """
+        # Now should be closer. Start to zero in using slope around the value.
+        while pos_resid > self.skyTolerance and counter <= maxIterations:
+            if length > 6.0:
+                y = length * 0.1
+                dy = y * 2
+            elif length < 2.0:
+                y = length * 0.05
+                dy = y * 2
+            else:
+                y = 1.0
+                dy = 2.0
+            pos_resid = [0, 0]
+            for i, l in enumerate([(length - y), (length + y)]):
+                pos_resid[i], ratio = self._testResiduals(l)
+            slope = dy / (pos_resid[1] - pos_resid[0])
+            length = slope * (self.skyTolerance - pos_resid[0]) + (length - y)
+            length = np.min([maxLength, length])
+            pos_resid, ratio = self._testResiduals(length)
+            counter += 1
+            #print 'looping', counter, length, y, pos_resid, ratio
+        self.length = length
+        self.timestep = self.length / float(self.ngran)
+        if counter > maxIterations:
+            raise ValueError('Could not find appropriate segment length and timestep within %d iterations'
+                             % maxIterations)
 
+    def _getCoeffsPosition(self, time, ephs):
+        """Calculate coefficients for the ra/dec values of a single objects ephemerides.
 
+        Parameters
+        ----------
+        times : numpy.ndarray
+            The times of the ephemerides.
+        ephs : numpy.ndarray
+            The structured array returned by PyOrbEphemerides holding ephemeris values, for one object.
+
+        Returns
+        -------
+        numpy.ndarray
+            The ra coefficients
+        numpy.ndarray
+            The dec coefficients
+        float
+            The positional error residuals between fit and ephemeris values, in mas.
+        """
+        dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
+        coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = cheb.chebfit(time, ephs['ra'],
+                                                                      dradt_coord,
+                                                                      self.multipliers['position'][0],
+                                                                      self.multipliers['position'][1],
+                                                                      self.nCoeff['position'])
+        coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = cheb.chebfit(time, ephs['dec'],
+                                                                          ephs['ddecdt'],
+                                                                          self.multipliers['position'][0],
+                                                                          self.multipliers['position'][1],
+                                                                          self.nCoeff['position'])
+        max_pos_resid = np.max(np.sqrt(resid_dec**2 +
+                                       (resid_ra * np.cos(np.radians(ephs['dec'])))**2))
+        # Convert position residuals to mas.
+        max_pos_resid *= 3600.0*1000.0
+        return coeff_ra, coeff_dec, max_pos_resid
+
+    def _getCoeffsOther(self, time, ephs):
+        """Calculate coefficients for the ra/dec values of a single objects ephemerides.
+
+        Parameters
+        ----------
+        times : numpy.ndarray
+            The times of the ephemerides.
+        ephs : numpy.ndarray
+            The structured array returned by PyOrbEphemerides holding ephemeris values, for one object.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the coefficients for each of 'delta', 'vmag', 'elongation'
+        dict
+            Dictionary containing the max residual values for each of 'delta', 'vmag', 'elongation'.
+        """
+        coeffs = {}
+        max_resids = {}
+        for key, ephValue in zip(('delta', 'vmag', 'elongation'), ('delta', 'magV', 'solarelon')):
+            coeffs[key], resid, rms, max_resids[key] = cheb.chebfit(time, ephs[ephValue], None,
+                                                                    self.multipliers[key][0],
+                                                                    self.multipliers[key][1],
+                                                                    self.nCoeff[key])
+        return coeffs, max_resids
+
+        
     def doOneRecursiveSegment(self):
         pass
     # Need to make a version of doOneRecursiveSegment, and think about 'controller' script.

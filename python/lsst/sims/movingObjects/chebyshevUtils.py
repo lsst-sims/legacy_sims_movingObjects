@@ -224,7 +224,7 @@ def makeChebMatrixOnlyX(nPoints, nPoly):
 
     c1c2 = c1c2.reshape(nPoly + 2, nPoints)
     c1c2 = c1c2[:, ::-1]
-    return c1c2[0:nPoly]
+    return c1c2[0:nPoly], None
 
 
 def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):

@@ -25,3 +25,4 @@
 from .version import *
 from .orbits import *
 from .ephemerides import *
+from .chebyshev import *
