@@ -1,15 +1,19 @@
 import unittest
+import os
 import numpy as np
+import pandas as pd
+from astropy.time import Time
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
 
-class testPyOrbEphemerides(unittest.TestCase):
+class TestPyOrbEphemerides(unittest.TestCase):
     def setUp(self):
+        self.testdir = 'testOrbits'
         self.orbits = Orbits()
-        self.orbits.readOrbits('test_orbitsQ.des')
+        self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.orbitsA = Orbits()
-        self.orbitsA.readOrbits('test_orbitsA.des')
+        self.orbitsA.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.ephems = PyOrbEphemerides()
 
     def tearDown(self):
@@ -24,6 +28,13 @@ class testPyOrbEphemerides(unittest.TestCase):
         # Test that setting with something other than an Orbit object fails.
         with self.assertRaises(ValueError):
             self.ephems.setOrbits(self.orbits.orbits)
+        # Test that setting with an empty orbit object fails.
+        # (Avoids hard-to-interpret errors from pyoorb).
+        with self.assertRaises(ValueError):
+            emptyOrb = Orbits()
+            empty = pd.DataFrame([], columns=self.orbits.dataCols['KEP'])
+            emptyOrb.setOrbits(empty)
+            self.ephems.setOrbits(emptyOrb)
 
     def testConvertOorbArray(self):
         # Check that orbital elements are converted.
@@ -98,6 +109,48 @@ class testPyOrbEphemerides(unittest.TestCase):
         for column in ephsAll.dtype.names:
             np.testing.assert_almost_equal(ephsAllA[column], ephsAll[column])
 
+class TestJPLValues(unittest.TestCase):
+    """Test the oorb generated RA/Dec values against JPL generated RA/Dec values."""
+    def setUp(self):
+        # Read orbits.
+        self.orbits = Orbits()
+        self.orbits.readOrbits('S0_n747.des', skiprows=1)
+        # Read JPL ephems.
+        self.jpl = pd.read_table('807_n747.txt', delim_whitespace=True)
+        # Add times in TAI and UTC, because.
+        t = Time(self.jpl['epoch_mjd'], format='mjd', scale='utc')
+        self.jpl['mjdTAI'] = t.tai.mjd
+        self.jpl['mjdUTC'] = t.utc.mjd
+
+    def tearDown(self):
+        del self.orbits
+        del self.jpl
+
+    def testRADec(self):
+        # We won't compare Vmag, because this also needs information on trailing losses.
+        times = self.jpl['mjdUTC'].unique()
+        deltaRA = np.zeros(len(times), float)
+        deltaDec = np.zeros(len(times), float)
+        for i, t in enumerate(times):
+            # Find the JPL objIds visible at this time.
+            j = self.jpl.query('mjdUTC == @t').sort_values('objId')
+            # Set the ephems, using the objects seen at this time.
+            suborbits = self.orbits.orbits.query('objId in @j.objId').sort_values('objId')
+            subOrbits = Orbits()
+            subOrbits.setOrbits(suborbits)
+            ephems = PyOrbEphemerides()
+            ephems.setOrbits(subOrbits)
+            ephs = ephems.generateEphemerides([t], timeScale='UTC', obscode=807, byObject=False)
+            deltaRA[i] = np.abs(ephs['ra'] - j['ra_deg'].as_matrix()).max()
+            deltaDec[i] = np.abs(ephs['dec'] - j['dec_deg'].as_matrix()).max()
+        # Convert to mas
+        deltaRA *= 3600.*1000.
+        deltaDec *= 3600.*1000.
+        # Much of the time we're closer than 1mas, but there are a few which hit higher values.
+        self.assertTrue(np.max(deltaRA) < 18)
+        self.assertTrue(np.max(deltaDec) < 6)
+        self.assertTrue(np.std(deltaRA) < 2)
+        self.assertTrue(np.std(deltaDec) < 1)
 
 if __name__ == '__main__':
     unittest.main()
