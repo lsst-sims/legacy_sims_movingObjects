@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
@@ -8,15 +9,12 @@ def dtime(time_prev):
 
 if __name__ == '__main__':
 
-    orbitfiles = ['test_orbitsQ.des', 'test_orbitsMBA.s3m', 'test_orbitsOuter.s3m']
+    testdir = 'testOrbits'
+    orbitfiles = ['test_orbitsNEO.s3m', 'test_orbitsMBA.s3m', 'test_orbitsOuter.s3m']
     print "ncoeff ngran otype length timestep resid mean_resid max_resid dt"
     for ocount, ofile in enumerate(orbitfiles):
         orbits = Orbits()
-        if ofile.endswith('.s3m'):
-            skiprows = 1
-        else:
-            skiprows = 0
-        orbits.readOrbits(ofile, skiprows=skiprows)
+        orbits.readOrbits(os.path.join(testdir, ofile), skiprows=1)
         tStart = orbits.orbits['epoch'].iloc[0]
         # Use a variety of segment length and timestep to see the effect on the residuals.
         length = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 1.25, 1.5, 1.75,
