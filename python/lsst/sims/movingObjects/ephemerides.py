@@ -6,6 +6,10 @@ import pandas as pd
 import pyoorb as oo
 from .orbits import Orbits
 
+import time
+def dtime(time_prev):
+    return (time.time() - time_prev, time.time())
+
 __all__ = ['PyOrbEphemerides']
 
 class PyOrbEphemerides(object):
@@ -39,6 +43,8 @@ class PyOrbEphemerides(object):
         """
         if not isinstance(orbitObj, Orbits):
             raise ValueError('Need to provide an Orbits object, to validate orbital parameters.')
+        if len(orbitObj) == 0:
+            raise ValueError('There are no orbits in the Orbit instance.')
         self.orbitObj = orbitObj
         self._convertOorbElem()
 
@@ -137,6 +143,8 @@ class PyOrbEphemerides(object):
         numpy.ndarray
             The oorb-formatted 'ephTimes' array.
         """
+        if len(times) == 0:
+            raise ValueError('Got zero times to convert for OpenOrb')
         ephTimes = np.array(zip(times, repeat(self.timeScales[timeScale], len(times))),
                             dtype='double', order='F')
         return ephTimes
@@ -212,7 +220,8 @@ class PyOrbEphemerides(object):
                                         'ddecdt', 'phase', 'solarelon', 'velocity'])
         return ephs
 
-    def generateEphemerides(self, times, timeScale='UTC', obscode=807, byObject=True):
+    def generateEphemerides(self, times, timeScale='UTC', obscode=807, byObject=True,
+                            verbose=False):
         """Calculate ephemerides for all orbits at times `times`.
 
         This is a public method, wrapping self._convertTimes, self._generateOorbEphs
@@ -235,18 +244,25 @@ class PyOrbEphemerides(object):
             Ephemeris times in oorb format (see self.convertTimes)
         obscode : int, optional
             The observatory code for ephemeris generation. Default=807 (Cerro Tololo).
-         byObject : boolean, optional
+        byObject : boolean, optional
             If True (default), resulting converted ephemerides are grouped by object.
             If False, resulting converted ephemerides are grouped by time.
+        verbose: boolean, optional
+            If True, prints time required to calculate ephemerides. Default is False.
 
         Returns
         -------
         numpy.ndarray
             The ephemeris values, organized as chosen by the user.
         """
+        t = time.time()
         ephTimes = self._convertTimes(times, timeScale=timeScale)
         oorbEphs = self._generateOorbEphs(ephTimes, obscode=obscode)
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
+        dt, t = dtime(t)
+        if verbose:
+            print "# Calculating ephemerides for %d objects over %d times required %f seconds"\
+                  % (len(self.orbitObj), len(times), dt)
         return ephs
 
     def propagateOrbits(self, newEpoch):
