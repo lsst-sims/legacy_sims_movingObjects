@@ -1,4 +1,5 @@
 import os
+import warnings
 import numpy as np
 import chebyshevUtils as cheb
 from .orbits import Orbits
@@ -6,16 +7,11 @@ from .ephemerides import PyOrbEphemerides
 
 __all__ = ['ChebyFits']
 
-def three_sixy_to_neg(element, min, max):
-    if (min < 100) & (max > 270):
-        if element > 270:
-            return element - 360.
-        else:
-            return element
-    else:
-        return element
-v_360_to_neg = np.vectorize(three_sixy_to_neg)
-
+def three_sixty_to_neg(ra):
+    """Wrap discontiguous RA values into more-contiguous results."""
+    if (ra.min() < 100) and (ra.max() > 270):
+        ra = np.where(ra > 270, ra - 360, ra)
+    return ra
 
 class ChebyFits(object):
     """Generates chebyshev coefficients for a provided set of orbits.
@@ -59,11 +55,19 @@ class ChebyFits(object):
         The number of ephemeris points within each Chebyshev polynomial segment. Default 64.
     ephFile : str, optional
         The path to the JPL ephemeris file to use. Default is '$OORB_DATA/de405.dat'.
+    databaseCoeffs : bool, optional
+        A flag indicating whether or not (True/False) the output coefficients are headed for the LSST SIMS database.
+        If True, the starting/end times of each segment must match *exactly*.
+    nDecimal : int, optional
+        The number of decimal places to allow in the segment length (and thus the times of the endpoints) can be
+        optionally limited to nDecimal places.
+        For the LSST SIMS moving object database, this should be 2 decimal places for non-NEOs, 14 for NEOs.
+        For any other use, a default of 10 should allow plenty of freedom while still providing a limit for file output.
     """
     def __init__(self, orbitObj, tStart, tEnd, timeScale='TAI',
                  obscode=807, skyTolerance=2.5,
                  nCoeff_position=14, nCoeff_vmag=9, nCoeff_delta=5,
-                 nCoeff_elongation=5, ngran=128, ephFile=None):
+                 nCoeff_elongation=5, ngran=128, ephFile=None, databaseCoeffs=False, nDecimal=10):
         # Set up PyOrbEphemerides.
         if ephFile is None:
             ephFile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
@@ -90,6 +94,8 @@ class ChebyFits(object):
         self.nCoeff['delta'] = nCoeff_delta
         self.nCoeff['elongation'] = nCoeff_elongation
         self.ngran = ngran
+        self.databaseCoeffs = databaseCoeffs
+        self.nDecimal = 14 # 2 for MBA, 14 for NEO
         # Precompute multipliers (we only do this once, instead of per segment).
         self._precomputeMultipliers()
 
@@ -126,7 +132,17 @@ class ChebyFits(object):
         self.pyephems.propagateOrbits(newEpoch)
         """
 
-    def generateEphemerides(self, times, byObject=True):
+    def getAllTimes(self):
+        """Return an array of all times for all ephemerides, of all objects.
+        """
+        try:
+            self.timestep
+        except AttributeError:
+            raise AttributeError('Need to set self.timestep first, using calcGranularity.')
+        times = np.arange(self.tStart, self.tEnd + self.timestep / 2.0, self.timestep)
+        return times
+
+    def generateEphemerides(self, times, byObject=True, verbose=False):
         """Generate ephemerides using OpenOrb for all orbits.
 
         Parameters
@@ -135,19 +151,49 @@ class ChebyFits(object):
             The times to use for ephemeris generation.
         """
         return self.pyephems.generateEphemerides(times, obscode=self.obscode,
-                                                 timeScale=self.timeScale, byObject=byObject)
+                                                 timeScale=self.timeScale, byObject=byObject,
+                                                 verbose=verbose)
+
+    def _roundLength(self, length):
+        """Modify length, to fit in an 'integer multiple' within the tStart/tEnd,
+        and to have the desired number of decimal values.
+
+        Parameters
+        ----------
+        length : float
+            The input length value to be rounded.
+
+        Returns
+        -------
+        float
+            The rounded length value.
+        """
+        # Make length an integer value within the time interval.
+        int_factor = np.ceil((self.tEnd - self.tStart) / length)
+        length = (self.tEnd - self.tStart) / int_factor
+        if self.nDecimal is not None:
+            length = int(length * 10**(self.nDecimal)) / float(10**self.nDecimal)
+        if self.databaseCoeffs:
+            if ((self.tEnd - self.tStart) % length) != 0:
+                raise ValueError('The start and end times for this segment are incompatible with the'
+                                 ' desired length, given that the segment end points must match exactly for database use.')
+        return length
 
     def _testResiduals(self, length, cutoff=85):
         """Calculate the position residual, for a test case.
+        Convenience function to make calcGranularity easier to read.
         """
         # The pos_resid used will be the 'cutoff' percentile of all max residuals per object.
         max_pos_resids = np.zeros(len(self.orbitObj), float)
         timestep = length / float(self.ngran)
         # Test for one segment at the midpoint.
         times = np.arange(self.midPoint, self.midPoint + length + timestep / 2.0, timestep)
+        # We must regenerate ephemerides here, because the timestep is different each time.
         ephs = self.generateEphemerides(times, byObject=True)
+        # Look for the coefficients and residuals.
         for i, e in enumerate(ephs):
             coeff_ra, coeff_dec, max_pos_resids[i] = self._getCoeffsPosition(times, e)
+        # Find a representative value and return.
         pos_resid = np.percentile(max_pos_resids, cutoff)
         ratio = pos_resid / self.skyTolerance
         return pos_resid, ratio
@@ -156,6 +202,8 @@ class ChebyFits(object):
         """Set the typical timestep and segment length for all objects between tStart/tEnd.
 
         Sets self.length and self.timestep, (length / timestep = self.ngran)
+        The resulting segment length will fit into the time period between tStart/tEnd an approximately integer
+        multiple of times, and will only have a given number of decimal places.
 
         Parameters
         ----------
@@ -165,6 +213,11 @@ class ChebyFits(object):
         """
         # If length is specified, use it and do nothing else.
         if length is not None:
+            length = self._roundLength(length)
+            pos_resid, ratio = self._testResiduals(length)
+            if pos_resid > self.skyTolerance:
+                warnings.warn('Will set length and timestep, but this value of length '
+                              'produces residuals (%f) > skyTolerance (%f).' % (pos_resid, self.skyTolerance))
             self.length = length
             self.timestep = self.length / float(self.ngran)
             return
@@ -180,48 +233,31 @@ class ChebyFits(object):
         maxLength = 60
         maxIterations = 100
         if self.skyTolerance < 5:
+            # This is the cap of the low-linearity regime, looping below will refine this value.
             length = 2.0
         elif self.skyTolerance >= 5000:
-            # Super approximate guess.
+            # Make a very rough guess.
             length = np.round((5000.0 / 20.0) * (self.skyTolerance - 5000.)) + 5.0
-            length = np.min([maxLength, length])
+            length = np.min([maxLength, int(length * 10) / 10.0])
         else:
             # Try to pick a length somewhere in the middle of the fast increase.
             length = 4.0
         # Check the resulting residuals.
         pos_resid, ratio = self._testResiduals(length)
         counter = 1
-        """
-        print 'first try', counter, length, pos_resid, ratio
-        # Do a fast increase / decrease, stopping if we make things much worse.
-        # Seems like this may hardly ever get used.
-        while ((ratio > 4) or (ratio < 0.25)) and (length <= maxLength):
-            prev_length = length
-            prev_ratio = ratio
-            prev_pos_resid = pos_resid
-            length = prev_length / prev_ratio * 4.0
-            pos_resid, ratio = self._testResiduals(length)
-            counter += 1
-            if (((ratio / prev_ratio > 2) and ratio > 1) or
-                ((ratio / prev_ratio < 0.5) and ratio < 1)):
-                # Did we overcorrect?
-                print 'going back', counter, length, pos_resid, ratio, prev_ratio
-                length = prev_length
-                pos_resid = prev_pos_resid
-                break
-            print 'fast change', counter, length, pos_resid, ratio, prev_ratio
-        if length > maxLength and pos_resid > self.skyTolerance:
-            length = maxLength
-        """
-        # Now should be closer. Start to zero in using slope around the value.
+        #print 'Start', counter, length, pos_resid, ratio
+        # Now should be relatively close. Start to zero in using slope around the value.
         while pos_resid > self.skyTolerance and counter <= maxIterations:
             if length > 6.0:
+                # In the high residual regime, look for wider gap to avoid fast swings in residual values.
                 y = length * 0.1
                 dy = y * 2
             elif length < 2.0:
+                # In the low residual regime, look for a small gap to avoid getting into the fast-rise if possible.
                 y = length * 0.05
                 dy = y * 2
             else:
+                # In between, try to step by a day.
                 y = 1.0
                 dy = 2.0
             pos_resid = [0, 0]
@@ -233,6 +269,11 @@ class ChebyFits(object):
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
             #print 'looping', counter, length, y, pos_resid, ratio
+        # Tidy up some characteristics of "length": make it fit an integer number of times into overall timespan,
+        # and use a given number of decimal places (easier for database storage).
+        length = self._roundLength(length)
+        pos_resid, ratio = self._testResiduals(length)
+        #print 'final', counter, length, pos_resid, ratio
         self.length = length
         self.timestep = self.length / float(self.ngran)
         if counter > maxIterations:
@@ -259,7 +300,7 @@ class ChebyFits(object):
             The positional error residuals between fit and ephemeris values, in mas.
         """
         dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
-        coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = cheb.chebfit(time, ephs['ra'],
+        coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = cheb.chebfit(time, three_sixty_to_neg(ephs['ra']),
                                                                       dradt_coord,
                                                                       self.multipliers['position'][0],
                                                                       self.multipliers['position'][1],
@@ -301,12 +342,10 @@ class ChebyFits(object):
                                                                     self.nCoeff[key])
         return coeffs, max_resids
 
-        
-    def doOneRecursiveSegment(self):
+    def doOneSegment(self, tSegmentStart, tSegmentEnd):
+        """Calculate the coefficients for a single Chebyshev segment.
+
+        Parameters
+        ----------
+        """
         pass
-    # Need to make a version of doOneRecursiveSegment, and think about 'controller' script.
-    # controller script would use one instance of this class, then set orbits (all objects)
-    # then propagate all orbits to the start of the interval (need to test this)
-    # then calculate default ephemerides over desired interval (default timestep)
-    # Then in doOneRecursiveSegment, if residuals are too high, can redo ephemerides for that object
-    # on a tighter grid and with shorter segment length (count how often this happens?)
