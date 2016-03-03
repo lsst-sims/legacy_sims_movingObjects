@@ -35,8 +35,10 @@ if __name__ == '__main__':
             markerstyle[otype] = '.'
     # Make plots.
     plt.figure()
-    ngranPlot = d.ngran.unique() # ([64, 128])
-    ncoeffPlot = d.ncoeff.unique() # ([14])
+    ngranPlot = d.ngran.unique() 
+    ngranPlot = ([64, 128])
+    ncoeffPlot = d.ncoeff.unique()
+    ncoeffPlot = ([14])
     for ngran in ngranPlot:
         for ncoeff in ncoeffPlot:
             for otype in d.otype.unique():
@@ -49,6 +51,6 @@ if __name__ == '__main__':
     #plt.xlabel('Calculation time (seconds)')
     plt.ylabel('Segment length (days)')
     plt.legend(loc=(0.95, 0), fontsize='smaller')
-    plt.xlim(0, 7000)
-    plt.ylim(0, 8)
+    plt.xlim(0, 1000)
+    #plt.ylim(0, 2)
     plt.show()
