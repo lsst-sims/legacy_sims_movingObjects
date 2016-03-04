@@ -87,7 +87,8 @@ if __name__ == '__main__':
                                                                              resid['vmag'], resid['elongation'])
 
 
-    failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' %(tStart, tEnd)
-    with open(failedFile, 'w') as f:
-        for i, failed in enumerate(cheb.failed):
-            print >>f, failed
+    if len(cheb.failed) > 0:
+        failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' %(tStart, tEnd)
+        with open(failedFile, 'w') as f:
+            for i, failed in enumerate(cheb.failed):
+                print >>f, failed
