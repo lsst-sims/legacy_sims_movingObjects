@@ -9,7 +9,7 @@ from lsst.sims.movingObjects import PyOrbEphemerides
 
 class TestPyOrbEphemerides(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'testOrbits'
+        self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.orbitsA = Orbits()
@@ -114,9 +114,9 @@ class TestJPLValues(unittest.TestCase):
     def setUp(self):
         # Read orbits.
         self.orbits = Orbits()
-        self.orbits.readOrbits('S0_n747.des', skiprows=1)
+        self.orbits.readOrbits('jpl_testdata/S0_n747.des', skiprows=1)
         # Read JPL ephems.
-        self.jpl = pd.read_table('807_n747.txt', delim_whitespace=True)
+        self.jpl = pd.read_table('jpl_testdata/807_n747.txt', delim_whitespace=True)
         # Add times in TAI and UTC, because.
         t = Time(self.jpl['epoch_mjd'], format='mjd', scale='utc')
         self.jpl['mjdTAI'] = t.tai.mjd

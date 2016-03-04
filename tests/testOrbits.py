@@ -6,7 +6,7 @@ from lsst.sims.movingObjects import Orbits
 
 class TestOrbits(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'testOrbits'
+        self.testdir = 'orbits_testdata'
 
     def testBuiltIns(self):
         orbits = Orbits()

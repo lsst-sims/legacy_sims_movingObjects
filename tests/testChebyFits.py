@@ -6,7 +6,7 @@ from lsst.sims.movingObjects import ChebyFits
 
 class TestChebyFits(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'testOrbits'
+        self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.cheb = ChebyFits(self.orbits, 54800, 54830, ngran=64, skyTolerance=2.5, nDecimal=2)
@@ -74,7 +74,7 @@ class TestChebyFits(unittest.TestCase):
 
 class TestDbRun(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'testOrbits'
+        self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.orbits = self.orbits[0]
