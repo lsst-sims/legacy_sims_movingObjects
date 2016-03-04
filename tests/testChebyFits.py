@@ -1,6 +1,5 @@
 import unittest
 import os
-import numpy as np
 import warnings
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
@@ -36,7 +35,7 @@ class TestChebyFits(unittest.TestCase):
         self.assertTrue(self.cheb.length < 1.9)
         # Test that we get a warning about the residuals if we try to set the length to be too long.
         with warnings.catch_warnings(record=True) as w:
-            self.cheb.calcGranularity(length = 5.0)
+            self.cheb.calcGranularity(length=5.0)
             self.assertTrue(len(w), 1)
         # Now check granularity works for other orbit types (which would have other standard lengths).
         # Check for multiple orbit types.
@@ -44,20 +43,20 @@ class TestChebyFits(unittest.TestCase):
             print orbitFile
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
             tStart = self.orbits.orbits['epoch'].iloc[0]
-            cheb = ChebyFits(self.orbits, tStart, tStart+30, ngran=64, nDecimal=2)
+            cheb = ChebyFits(self.orbits, tStart, tStart + 30, ngran=64, nDecimal=2)
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 5.0, 10.0, 100.0, 1000.0, 20000.0):
                 cheb.skyTolerance = skyTolerance
                 cheb.calcGranularity()
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
-                self.assertEqual((cheb.length*100 % 1), 0)
+                self.assertEqual((cheb.length * 100) % 1, 0)
                 #print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
         # And check for challenging 'impactors'.
         for orbitFile in (['test_orbitsImpactors.s3m']):
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
             tStart = self.orbits.orbits['epoch'].iloc[0]
-            cheb = ChebyFits(self.orbits, tStart, tStart+30, ngran=64, nDecimal=10)
+            cheb = ChebyFits(self.orbits, tStart, tStart + 30, ngran=64, nDecimal=10)
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 10.0, 100.0):
                 cheb.skyTolerance = skyTolerance
@@ -88,8 +87,8 @@ class TestDbRun(unittest.TestCase):
         # Set up chebyshev fitter.
         tStart = self.orbits.orbits.epoch.iloc[0]
         interval = 30
-        cheb = ChebyFits(self.orbits, tStart, tStart+interval, ngran=64, skyTolerance=2.5, nDecimal=2)
-        # Set granularity.
+        cheb = ChebyFits(self.orbits, tStart, tStart + interval, ngran=64, skyTolerance=2.5, nDecimal=2)
+        # Set granularity. Use an value that will be too long, to trigger recursion below.
         cheb.calcGranularity(length=10.0)
         # Run through segments.
         cheb.calcSegments()
@@ -100,7 +99,7 @@ class TestDbRun(unittest.TestCase):
             self.assertEqual(te_prev, coeff['tStart'])
             te_prev = coeff['tEnd']
         # Test that the end of the last interval is equal to the end of the total interval
-        self.assertEqual(coeff['tEnd'], tStart+interval)
+        self.assertEqual(coeff['tEnd'], tStart + interval)
 
 if __name__ == '__main__':
     unittest.main()

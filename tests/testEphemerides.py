@@ -144,8 +144,8 @@ class TestJPLValues(unittest.TestCase):
             deltaRA[i] = np.abs(ephs['ra'] - j['ra_deg'].as_matrix()).max()
             deltaDec[i] = np.abs(ephs['dec'] - j['dec_deg'].as_matrix()).max()
         # Convert to mas
-        deltaRA *= 3600.*1000.
-        deltaDec *= 3600.*1000.
+        deltaRA *= 3600. * 1000.
+        deltaDec *= 3600. * 1000.
         # Much of the time we're closer than 1mas, but there are a few which hit higher values.
         self.assertTrue(np.max(deltaRA) < 18)
         self.assertTrue(np.max(deltaDec) < 6)
