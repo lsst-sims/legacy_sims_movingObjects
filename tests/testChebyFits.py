@@ -1,6 +1,7 @@
 import unittest
 import os
 import warnings
+import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 
@@ -15,6 +16,13 @@ class TestChebyFits(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.cheb
+
+    @classmethod
+    def tearDownClass(cls):
+        os.remove('tmpCoeff')
+        os.remove('tmpResids')
+        if os.path.isfile('tmpFailed'):
+            os.remove('tmpFailed')
 
     def testPrecomputeMultipliers(self):
         # Precompute multipliers is done as an automatic step in __init__.
@@ -40,7 +48,6 @@ class TestChebyFits(unittest.TestCase):
         # Now check granularity works for other orbit types (which would have other standard lengths).
         # Check for multiple orbit types.
         for orbitFile in (['test_orbitsMBA.s3m', 'test_orbitsOuter.s3m', 'test_orbitsNEO.s3m']):
-            print orbitFile
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
             tStart = self.orbits.orbits['epoch'].iloc[0]
             cheb = ChebyFits(self.orbits, tStart, tStart + 30, ngran=64, nDecimal=2)
@@ -72,16 +79,30 @@ class TestChebyFits(unittest.TestCase):
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
 
+    def testWrite(self):
+        # Test that we can write the output to files.
+        self.cheb.calcGranularity()
+        self.cheb.generateEphemerides(self.cheb.getAllTimes())
+        self.cheb.calcSegments()
+        self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
+        self.assertTrue(os.path.isfile('tmpCoeff'))
+        self.assertTrue(os.path.isfile('tmpResids'))
+
 class TestDbRun(unittest.TestCase):
     def setUp(self):
         self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
-        self.orbits = self.orbits[0]
-        print self.orbits.orbits
+        self.coeffFile = 'tmpCoeff'
+        self.residFile = 'tmpResid'
+        self.failedFile = 'tmpFailed'
 
     def tearDown(self):
         del self.orbits
+        os.remove(self.coeffFile)
+        os.remove(self.residFile)
+        if os.path.isfile(self.failedFile):
+            os.remove(self.failedFile)
 
     def testRun(self):
         # Set up chebyshev fitter.
@@ -89,17 +110,23 @@ class TestDbRun(unittest.TestCase):
         interval = 30
         cheb = ChebyFits(self.orbits, tStart, tStart + interval, ngran=64, skyTolerance=2.5, nDecimal=2)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
-        cheb.calcGranularity(length=10.0)
+        cheb.calcGranularity(length=2.0)
         # Run through segments.
         cheb.calcSegments()
-        te_prev = tStart
-        for coeff in cheb.coeffs:
-            #print coeff['objId'], coeff['tStart'], coeff['tEnd'], coeff['ra'][0]
-            # Test that the start of the current interval = the end of the previous interval.
-            self.assertEqual(te_prev, coeff['tStart'])
-            te_prev = coeff['tEnd']
+        # Check that write succeeds.
+        cheb.write(self.coeffFile, self.residFile, self.failedFile)
+        # Test that the segments for each individual object fit together start/end.
+        for k in cheb.coeffs:
+            cheb.coeffs[k] = np.array(cheb.coeffs[k])
+        for objId in np.unique(cheb.coeffs['objId']):
+            condition = (cheb.coeffs['objId'] == objId)
+            te_prev = tStart
+            for ts, te in zip(cheb.coeffs['tStart'][condition], cheb.coeffs['tEnd'][condition]):
+                # Test that the start of the current interval = the end of the previous interval.
+                self.assertEqual(te_prev, ts)
+                te_prev = te
         # Test that the end of the last interval is equal to the end of the total interval
-        self.assertEqual(coeff['tEnd'], tStart + interval)
+        self.assertEqual(te, tStart + interval)
 
 if __name__ == '__main__':
     unittest.main()

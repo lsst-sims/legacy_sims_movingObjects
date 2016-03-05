@@ -79,7 +79,6 @@ class ChebyFits(object):
         # Save input parameters.
         self.tStart = tStart
         self.tEnd = tEnd
-        self.midPoint = self.tStart + (self.tEnd - self.tStart) / 2.0
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
         elif timeScale.upper() == 'UTC':
@@ -92,16 +91,18 @@ class ChebyFits(object):
         self.skyTolerance = skyTolerance
         self.nCoeff = {}
         self.nCoeff['position'] = nCoeff_position
-        self.nCoeff['vmag'] = nCoeff_vmag
         self.nCoeff['delta'] = nCoeff_delta
+        self.nCoeff['vmag'] = nCoeff_vmag
         self.nCoeff['elongation'] = nCoeff_elongation
         self.ngran = ngran
         self.nDecimal = nDecimal  # 2 for MBA, 14 for NEO in LSST databases
         # Precompute multipliers (we only do this once, instead of per segment).
         self._precomputeMultipliers()
         # Initialize attributes to save the coefficients and residuals.
-        self.coeffs = []
-        self.resids = []
+        self.coeffs = {'objId': [], 'tStart': [], 'tEnd': [],
+                       'ra': [], 'dec': [], 'delta': [], 'vmag': [], 'elongation': []}
+        self.resids = {'objId': [], 'tStart': [], 'tEnd': [],
+                       'pos': [], 'delta': [], 'vmag': [], 'elongation': []}
         self.failed = []
 
     def _setOrbits(self, orbitsObj):
@@ -196,8 +197,9 @@ class ChebyFits(object):
         # The pos_resid used will be the 'cutoff' percentile of all max residuals per object.
         max_pos_resids = np.zeros(len(self.orbitsObj), float)
         timestep = length / float(self.ngran)
-        # Test for one segment at the midpoint.
-        times = np.arange(self.midPoint, self.midPoint + length + timestep / 2.0, timestep)
+        # Test for one segment near the start (would do at midpoint, but for long timespans
+        # this is not efficient .. a point near the start should be fine).
+        times = np.arange(self.tStart, self.tStart + length + timestep / 2.0, timestep)
         # We must regenerate ephemerides here, because the timestep is different each time.
         ephs = self.generateEphemerides(times, byObject=True)
         # Look for the coefficients and residuals.
@@ -404,20 +406,23 @@ class ChebyFits(object):
                               % (objId, tSegmentStart, tSegmentEnd))
                 self.failed.append((orbitObj.orbits['objId'], tSegmentStart, tSegmentEnd))
             else:
-                # Consolidate items into the coeffs dictionary.
-                coeffs['ra'] = coeff_ra
-                coeffs['dec'] = coeff_dec
-                coeffs['objId'] = objId
-                coeffs['tStart'] = tSegmentStart
-                coeffs['tEnd'] = tSegmentEnd
-                # Consolidate items into the residuals dictionary.
-                max_resids['pos'] = max_pos_resid
-                max_resids['objId'] = objId
-                max_resids['tStart'] = tSegmentStart
-                max_resids['tEnd'] = tSegmentEnd
-                # Add these calculated values into the information we're tracking for all objects/all times.
-                self.coeffs.append(coeffs)
-                self.resids.append(max_resids)
+                # Consolidate items into the tracked coefficient values.
+                self.coeffs['objId'].append(objId)
+                self.coeffs['tStart'].append(tSegmentStart)
+                self.coeffs['tEnd'].append(tSegmentEnd)
+                self.coeffs['ra'].append(coeff_ra)
+                self.coeffs['dec'].append(coeff_dec)
+                self.coeffs['delta'].append(coeffs['delta'])
+                self.coeffs['vmag'].append(coeffs['vmag'])
+                self.coeffs['elongation'].append(coeffs['elongation'])
+                # Consolidate items into the tracked residual values.
+                self.resids['objId'].append(objId)
+                self.resids['tStart'].append(tSegmentStart)
+                self.resids['tEnd'].append(tSegmentEnd)
+                self.resids['pos'].append(max_pos_resid)
+                self.resids['delta'].append(max_resids['delta'])
+                self.resids['vmag'].append(max_resids['delta'])
+                self.resids['elongation'].append(max_resids['elongation'])
 
     def _subdivideSegment(self, orbitObj, ephs):
         """Subdivide a segment, then calculate the segment coefficients.
@@ -444,6 +449,71 @@ class ChebyFits(object):
                              nDecimal=self.nDecimal)
         newCheby.calcGranularity()
         newCheby.calcSegments()
-        self.coeffs += (newCheby.coeffs)
-        self.resids += (newCheby.coeffs)
-        self.failed += (newCheby.failed)
+        # Add subdivided segment values into tracked values here.
+        for k in self.coeffs:
+            self.coeffs[k] += newCheby.coeffs[k]
+        for k in self.resids:
+            self.resids[k] += newCheby.resids[k]
+        self.failed += newCheby.failed
+
+    def write(self, coeffFile, residFile, failedFile, append=False):
+        """Write coefficients, residuals and failed fits to disk.
+
+        Parameters
+        ----------
+        coeffFile : str
+            The filename for the coefficient values.
+        residFile : str
+            The filename for the residual values.
+        failedFile : str
+            The filename to write the failed fit information (if failed objects exist).
+        append : bool, optional
+            Flag to append (or overwrite) the output files.
+        """
+        if append:
+            openMode = 'wa'
+        else:
+            openMode = 'w'
+        # Write a header to the coefficients file, if writing to a new file:
+        if (not append) or (not os.path.isfile(coeffFile)):
+            header = 'objId tStart tEnd ra(%d) dec(%d) delta(%d) vmag(%d) elongation(%d)' \
+                     % (self.nCoeff['position'], self.nCoeff['position'], self.nCoeff['delta'],
+                        self.nCoeff['vmag'], self.nCoeff['elongation'])
+        else:
+            header = None
+        with open(coeffFile, openMode) as f:
+            if header is not None:
+                print >>f, header
+            for i, (objId, tStart, tEnd, cRa, cDec, cDelta, cVmag, cE) in enumerate(zip(self.coeffs['objId'],
+                                                                                        self.coeffs['tStart'],
+                                                                                        self.coeffs['tEnd'],
+                                                                                        self.coeffs['ra'],
+                                                                                        self.coeffs['dec'],
+                                                                                        self.coeffs['delta'],
+                                                                                        self.coeffs['vmag'],
+                                                                                        self.coeffs['elongation'])):
+                print >>f, "%s %.10f %.10f %s %s %s %s %s" % (objId, tStart, tEnd,
+                                                              " ".join('%.14e' % j for j in cRa),
+                                                              " ".join('%.14e' % j for j in cDec),
+                                                              " ".join('%.7e' % j for j in cDelta),
+                                                              " ".join('%.7e' % j for j in cVmag),
+                                                              " ".join('%.7e' % j for j in cE))
+
+        with open(residFile, openMode) as f:
+            for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in enumerate(zip(self.resids['objId'],
+                                                                                   self.resids['tStart'],
+                                                                                   self.resids['tEnd'],
+                                                                                   self.resids['pos'],
+                                                                                   self.resids['delta'],
+                                                                                   self.resids['vmag'],
+                                                                                   self.resids['elongation'])):
+                print >> f, "%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e" % (objId, i + 1,
+                                                                                 tStart, tEnd,
+                                                                                 (tEnd - tStart),
+                                                                                 rPos, rDelta,
+                                                                                 rVmag, rE)
+
+        if len(self.failed) > 0:
+            with open(failedFile, openMode) as f:
+                for i, failed in enumerate(self.cheb.failed):
+                    print >>f, failed
