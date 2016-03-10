@@ -368,7 +368,7 @@ class ChebyFits(object):
             # Cycle through all segments until we reach the end of the period we're fitting.
             while tSegmentStart < self.tEnd:
                 # Identify the subset of times and ephemerides which are relevant for this segment
-                # starting with the default segment size.
+                # (at the default segment size).
                 subset = np.where((times >= tSegmentStart) & (times <= (tSegmentStart + self.length)))
                 self.calcOneSegment(orbitObj, e[subset])
                 tSegmentStart = tSegmentStart + self.length
@@ -388,12 +388,12 @@ class ChebyFits(object):
         float, float
             The start and end times of the segment that were actually fit.
         """
-        objId = orbitObj.orbits['objId'].iloc[0]
+        #print orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1]
+        objId = orbitObj.orbits.objId.iloc[0]
         tSegmentStart = ephs['time'][0]
         tSegmentEnd = ephs['time'][-1]
         coeff_ra, coeff_dec, max_pos_resid = self._getCoeffsPosition(ephs)
         if max_pos_resid > self.skyTolerance:
-            print 'need to break down segment length'
             self._subdivideSegment(orbitObj, ephs)
         else:
             coeffs, max_resids = self._getCoeffsOther(ephs)

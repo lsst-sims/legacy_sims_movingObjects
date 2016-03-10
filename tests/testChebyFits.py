@@ -88,7 +88,7 @@ class TestChebyFits(unittest.TestCase):
         self.assertTrue(os.path.isfile('tmpCoeff'))
         self.assertTrue(os.path.isfile('tmpResids'))
 
-class TestDbRun(unittest.TestCase):
+class TestRun(unittest.TestCase):
     def setUp(self):
         self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
@@ -104,16 +104,16 @@ class TestDbRun(unittest.TestCase):
         if os.path.isfile(self.failedFile):
             os.remove(self.failedFile)
 
-    def testRun(self):
+    def testRunThrough(self):
         # Set up chebyshev fitter.
         tStart = self.orbits.orbits.epoch.iloc[0]
         interval = 30
         cheb = ChebyFits(self.orbits, tStart, tStart + interval, ngran=64, skyTolerance=2.5, nDecimal=2)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
-        cheb.calcGranularity(length=2.0)
+        cheb.calcGranularity(length=10.0)
         # Run through segments.
         cheb.calcSegments()
-        # Check that write succeeds.
+        # Write outputs.
         cheb.write(self.coeffFile, self.residFile, self.failedFile)
         # Test that the segments for each individual object fit together start/end.
         for k in cheb.coeffs:

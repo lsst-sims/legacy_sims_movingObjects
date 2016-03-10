@@ -106,7 +106,7 @@ class PyOrbEphemerides(object):
                                                              'meanAnomaly', 'elem_type', 'epoch',
                                                              'epoch_type',
                                                              'H', 'g'])
-            newOrbits['meanAnomaly'] = np.degrees(newOrbits['argPeri'])
+            newOrbits['meanAnomaly'] = np.degrees(newOrbits['meanAnomaly'])
         elif self.orbitObj.format == 'COM':
             newOrbits = pd.DataFrame(self.oorbElem, columns=['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
                                                              'tPeri', 'elem_type', 'epoch', 'epoch_type',
@@ -266,7 +266,8 @@ class PyOrbEphemerides(object):
         return ephs
 
     def propagateOrbits(self, newEpoch):
-        """Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
+        """DOES NOT YET WORK DUE TO ERRORS IN PYOORB!!!!
+        Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
 
         Parameters
         ----------

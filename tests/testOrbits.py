@@ -8,7 +8,7 @@ class TestOrbits(unittest.TestCase):
     def setUp(self):
         self.testdir = 'orbits_testdata'
 
-    def testBuiltIns(self):
+    def testEqualNotEqual(self):
         orbits = Orbits()
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.assertEqual(len(orbits), 4)
@@ -22,6 +22,19 @@ class TestOrbits(unittest.TestCase):
         assert_frame_equal(orbits3.orbits, orbits.orbits.head(1))
         for orb, (i, orbi) in zip(orbits, orbits.orbits.iterrows()):
             self.assertEqual(orb.orbits['objId'].values[0], orbi['objId'])
+            self.assertTrue(isinstance(orb, Orbits))
+
+    def testIterationAndIndexing(self):
+        orbits = Orbits()
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
+        orbitsSingle = orbits[0]
+        assert_frame_equal(orbitsSingle.orbits, orbits.orbits.query('index==0'))
+        orbitsSingle = orbits[3]
+        assert_frame_equal(orbitsSingle.orbits, orbits.orbits.query('index==3'))
+        for orb, (i, orbi) in zip(orbits, orbits.orbits.iterrows()):
+            self.assertEqual(orb.orbits.objId.values[0], orbi.objId)
+            self.assertTrue(isinstance(orb, Orbits))
+            self.assertEqual(orb.orbits.index, i)
 
     def testReadOrbits(self):
         orbits = Orbits()

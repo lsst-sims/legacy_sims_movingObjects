@@ -30,7 +30,9 @@ class Orbits(object):
         return orb
 
     def __iter__(self):
-        self.idx = 0
+        # Be sure to start iteration at starting point of orbits dataframe.
+        # The index value may not be 0 if we were using a subset pulled out of a previous orbits instance.
+        self.idx = self.orbits.index[0]
         return self
 
     def next(self):
