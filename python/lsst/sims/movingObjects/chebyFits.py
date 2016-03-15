@@ -476,9 +476,12 @@ class ChebyFits(object):
             openMode = 'w'
         # Write a header to the coefficients file, if writing to a new file:
         if (not append) or (not os.path.isfile(coeffFile)):
-            header = 'objId tStart tEnd ra(%d) dec(%d) delta(%d) vmag(%d) elongation(%d)' \
-                     % (self.nCoeff['position'], self.nCoeff['position'], self.nCoeff['delta'],
-                        self.nCoeff['vmag'], self.nCoeff['elongation'])
+            header = 'objId tStart tEnd '
+            header += ' '.join(['ra_%d' % x for x in range(self.nCoeff['position'])]) + ' '
+            header += ' '.join(['dec_%d' % x for x in range(self.nCoeff['position'])]) + ' '
+            header += ' '.join(['delta_%d' % x for x in range(self.nCoeff['delta'])]) + ' '
+            header += ' '.join(['vmag_%d' % x for x in range(self.nCoeff['vmag'])]) + ' '
+            header += ' '.join(['elongation_%d' % x for x in range(self.nCoeff['elongation'])])
         else:
             header = None
         with open(coeffFile, openMode) as f:

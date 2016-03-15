@@ -10,7 +10,8 @@ class TestChebyFits(unittest.TestCase):
         self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
-        self.cheb = ChebyFits(self.orbits, 54800, 54830, ngran=64, skyTolerance=2.5, nDecimal=2)
+        self.cheb = ChebyFits(self.orbits, 54800, 54830, ngran=64, skyTolerance=2.5,
+                              nDecimal=2, nCoeff_position=14)
         self.assertEqual(self.cheb.ngran, 64)
 
     def tearDown(self):
@@ -74,10 +75,20 @@ class TestChebyFits(unittest.TestCase):
 
     def testSegments(self):
         # Test that we can create segments.
-        self.cheb.calcGranularity()
+        self.cheb.calcGranularity(length=1.0)
         times = self.cheb.getAllTimes()
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
+        # We expect calculated coefficients to have the following keys:
+        coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
+        for k in coeffKeys:
+            self.assertTrue(k in self.cheb.coeffs.keys())
+        # And in this case, we had a 30 day timespan with 1 day segments
+        # (one day segments should be more than enough to meet 2.5mas tolerance, so not subdivided)
+        self.assertEqual(len(self.cheb.coeffs['tStart']), 30*len(self.orbits))
+        # And we used 14 coefficients for ra and dec.
+        self.assertEqual(len(self.cheb.coeffs['ra'][0]), 14)
+        self.assertEqual(len(self.cheb.coeffs['dec'][0]), 14)
 
     def testWrite(self):
         # Test that we can write the output to files.
