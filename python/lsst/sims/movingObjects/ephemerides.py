@@ -133,7 +133,7 @@ class PyOrbEphemerides(object):
 
         Parameters
         ----------
-        times : numpy.ndarray
+        times : numpy.ndarray or float
             The ephemeris times (MJD) desired
         timeScale : str, optional
             The timescale (UTC, UT1, TT, TAI) of the ephemeris MJD values. Default = UTC, MJD.
@@ -143,6 +143,8 @@ class PyOrbEphemerides(object):
         numpy.ndarray
             The oorb-formatted 'ephTimes' array.
         """
+        if isinstance(times, float):
+            times = np.array([times])
         if len(times) == 0:
             raise ValueError('Got zero times to convert for OpenOrb')
         ephTimes = np.array(zip(times, repeat(self.timeScales[timeScale], len(times))),
