@@ -172,14 +172,14 @@ class Orbits(object):
         altNames['q'] = ['q']
         altNames['a'] = ['a']
         altNames['e'] = ['e', 'ecc']
-        altNames['inc'] = ['inc', 'i', 'i(deg)']
+        altNames['inc'] = ['inc', 'i', 'i(deg)', 'incl']
         altNames['Omega'] = ['Omega', 'omega', 'node', 'om', 'node(deg)',
                              'BigOmega', 'Omega/node', 'longNode']
-        altNames['argPeri'] = ['argPeri', 'argperi', 'omega/argperi', 'w', 'argperi(deg)']
-        altNames['tPeri'] = ['tPeri', 't_p', 'timeperi', 't_peri']
+        altNames['argPeri'] = ['argPeri', 'argperi', 'omega/argperi', 'w', 'argperi(deg)', 'peri']
+        altNames['tPeri'] = ['tPeri', 't_p', 'timeperi', 't_peri', 'T_peri']
         altNames['epoch'] = ['epoch', 't_0', 'Epoch', 'epoch_mjd']
         altNames['H'] = ['H', 'magH', 'magHv', 'Hv', 'H_v']
-        altNames['g'] = ['g', 'phaseV', 'phase', 'gV', 'phase_g']
+        altNames['g'] = ['g', 'phaseV', 'phase', 'gV', 'phase_g', 'G']
         altNames['meanAnomaly'] = ['meanAnomaly', 'meanAnom', 'M', 'ma']
         altNames['sed_filename'] = ['sed_filename', 'sed']
 
