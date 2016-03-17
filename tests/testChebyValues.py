@@ -68,6 +68,7 @@ class TestChebyValues(unittest.TestCase):
         chebyValues = ChebyValues()
         chebyValues.setCoefficients(self.chebyFits)
         time = self.tStart + self.interval / 2.0
+        # Test for all objects.
         ephemerides = chebyValues.getEphemerides(time)
         pyephemerides = self.pyephems.generateEphemerides(time, obscode=807,
                                                           timeScale='TAI', byObject=False)
@@ -85,6 +86,10 @@ class TestChebyValues(unittest.TestCase):
         print 'elongation', np.max(resids)
         resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
         print 'vmag', np.max(resids)
+        # Test this for a subset of the objects.
+        objIds = self.orbits.orbits.objId.head(3).as_matrix()
+        ephemerides = chebyValues.getEphemerides(time, objIds)
+        self.assertEqual(len(ephemerides['ra']), 3)
 
 if __name__ == '__main__':
     unittest.main()
