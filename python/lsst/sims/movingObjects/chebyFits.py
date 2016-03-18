@@ -144,7 +144,7 @@ class ChebyFits(object):
         try:
             self.timestep
         except AttributeError:
-            raise AttributeError('Need to set self.timestep first, using calcGranularity.')
+            raise AttributeError('Need to set self.timestep first, using calcSegmentLength.')
         times = np.arange(self.tStart, self.tEnd + self.timestep / 2.0, self.timestep)
         return times
 
@@ -176,23 +176,32 @@ class ChebyFits(object):
         """
         # Make length an integer value within the time interval.
         timespan = self.tEnd - self.tStart
+        tolerance = 1.0e-30
         if self.nDecimal is not None:
             length = int(length * 10**(self.nDecimal)) / float(10**self.nDecimal)
+            tolerance = 10.**(-1*self.nDecimal - 1)
         counter = 0
-        while ((timespan % length) != 0) and (counter < 100):
+        prev_int_factor = np.ceil(timespan / length)
+        while ((timespan % length) > tolerance) and (length > 0) and (counter < 100):
             int_factor = np.ceil(timespan / length)
+            if int_factor == prev_int_factor:
+                int_factor = prev_int_factor + 1
+            prev_int_factor = int_factor
             length = timespan / int_factor
             if self.nDecimal is not None:
                 length = int(length * 10**(self.nDecimal)) / float(10**self.nDecimal)
             counter += 1
-        if (timespan % length) != 0:
-            raise ValueError('Could not find a suitable length for the timespan (%f to %f)'
-                             % (self.tStart, self.tEnd))
+        if (timespan % length) > tolerance:
+            # Add this entire segment into the failed list.
+            for objId in self.orbitsObj.orbits['objId'].as_matrix():
+                self.failed.append((objId, self.tStart, self.tEnd))
+            raise ValueError('Could not find a suitable length for the timespan (%f to %f: D %f)'
+                             % (self.tStart, self.tEnd, self.tEnd-self.tStart))
         return length
 
-    def _testResiduals(self, length, cutoff=85):
+    def _testResiduals(self, length, cutoff=99):
         """Calculate the position residual, for a test case.
-        Convenience function to make calcGranularity easier to read.
+        Convenience function to make calcSegmentLength easier to read.
         """
         # The pos_resid used will be the 'cutoff' percentile of all max residuals per object.
         max_pos_resids = np.zeros(len(self.orbitsObj), float)
@@ -210,8 +219,8 @@ class ChebyFits(object):
         ratio = pos_resid / self.skyTolerance
         return pos_resid, ratio
 
-    def calcGranularity(self, length=None):
-        """Set the typical timestep and segment length for all objects between tStart/tEnd.
+    def calcSegmentLength(self, length=None):
+        """Set the typical initial ephemeris timestep and segment length for all objects between tStart/tEnd.
 
         Sets self.length and self.timestep, (length / timestep = self.ngran)
 
@@ -255,10 +264,13 @@ class ChebyFits(object):
         else:
             # Try to pick a length somewhere in the middle of the fast increase.
             length = 4.0
+        # Tidy up some characteristics of "length":
+        # make it fit an integer number of times into overall timespan.
+        # and use a given number of decimal places (easier for database storage).
+        length = self._roundLength(length)
         # Check the resulting residuals.
         pos_resid, ratio = self._testResiduals(length)
         counter = 1
-        #print 'Start', counter, length, pos_resid, ratio
         # Now should be relatively close. Start to zero in using slope around the value.
         while pos_resid > self.skyTolerance and counter <= maxIterations:
             if length > 6.0:
@@ -279,19 +291,17 @@ class ChebyFits(object):
             slope = dy / (pos_resid[1] - pos_resid[0])
             length = slope * (self.skyTolerance - pos_resid[0]) + (length - y)
             length = np.min([maxLength, length])
+            length = self._roundLength(length)
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
-            #print 'looping', counter, length, y, pos_resid, ratio
-        # Tidy up some characteristics of "length":
-        # make it fit an integer number of times into overall timespan.
-        # and use a given number of decimal places (easier for database storage).
-        length = self._roundLength(length)
         pos_resid, ratio = self._testResiduals(length)
-        #print 'final', counter, length, pos_resid, ratio
         self.length = length
         self.timestep = self.length / float(self.ngran)
         if counter > maxIterations:
-            raise ValueError('Could not find appropriate segment length and timestep within %d iterations'
+            # Add this entire segment into the failed list.
+            for objId in self.orbitsObj.orbits['objId'].as_matrix():
+                self.failed.append((objId, self.tStart, self.tEnd))
+            raise ValueError('Could not find appropriate segment length to meet skyTolerance within %d iterations'
                              % maxIterations)
 
     def _getCoeffsPosition(self, ephs):
@@ -316,15 +326,15 @@ class ChebyFits(object):
         dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
         coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = cheb.chebfit(ephs['time'],
                                                                       three_sixty_to_neg(ephs['ra']),
-                                                                      dradt_coord,
-                                                                      self.multipliers['position'][0],
-                                                                      self.multipliers['position'][1],
-                                                                      self.nCoeff['position'])
+                                                                      dxdt=dradt_coord,
+                                                                      xMultiplier=self.multipliers['position'][0],
+                                                                      dxMultiplier=self.multipliers['position'][1],
+                                                                      nPoly=self.nCoeff['position'])
         coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = cheb.chebfit(ephs['time'], ephs['dec'],
-                                                                          ephs['ddecdt'],
-                                                                          self.multipliers['position'][0],
-                                                                          self.multipliers['position'][1],
-                                                                          self.nCoeff['position'])
+                                                                          dxdt=ephs['ddecdt'],
+                                                                          xMultiplier=self.multipliers['position'][0],
+                                                                          dxMultiplier=self.multipliers['position'][1],
+                                                                          nPoly=self.nCoeff['position'])
         max_pos_resid = np.max(np.sqrt(resid_dec**2 +
                                        (resid_ra * np.cos(np.radians(ephs['dec'])))**2))
         # Convert position residuals to mas.
@@ -349,10 +359,11 @@ class ChebyFits(object):
         coeffs = {}
         max_resids = {}
         for key, ephValue in zip(('delta', 'vmag', 'elongation'), ('delta', 'magV', 'solarelon')):
-            coeffs[key], resid, rms, max_resids[key] = cheb.chebfit(ephs['time'], ephs[ephValue], None,
-                                                                    self.multipliers[key][0],
-                                                                    self.multipliers[key][1],
-                                                                    self.nCoeff[key])
+            coeffs[key], resid, rms, max_resids[key] = cheb.chebfit(ephs['time'], ephs[ephValue],
+                                                                    dxdt=None,
+                                                                    xMultiplier=self.multipliers[key][0],
+                                                                    dxMultiplier=self.multipliers[key][1],
+                                                                    nPoly=self.nCoeff[key])
         return coeffs, max_resids
 
     def calcSegments(self):
@@ -388,14 +399,16 @@ class ChebyFits(object):
         float, float
             The start and end times of the segment that were actually fit.
         """
-        #print orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1]
         objId = orbitObj.orbits.objId.iloc[0]
         tSegmentStart = ephs['time'][0]
         tSegmentEnd = ephs['time'][-1]
         coeff_ra, coeff_dec, max_pos_resid = self._getCoeffsPosition(ephs)
         if max_pos_resid > self.skyTolerance:
+            #print 'subdividing segments', orbitObj.orbits.objId.iloc[0]
             self._subdivideSegment(orbitObj, ephs)
         else:
+            #print self.length, len(ephs['magV']), len(ephs['time']),
+            #print self.multipliers['delta'][0].shape, self.multipliers['vmag'][0].shape, self.multipliers['elongation'][0].shape
             coeffs, max_resids = self._getCoeffsOther(ephs)
             fitFailed = False
             for k in max_resids:
@@ -447,7 +460,13 @@ class ChebyFits(object):
                              nCoeff_elongation=self.nCoeff['elongation'],
                              ngran=self.ngran, ephFile=self.ephFile,
                              nDecimal=self.nDecimal)
-        newCheby.calcGranularity()
+        try:
+            newCheby.calcSegmentLength()
+        except ValueError:
+            # Could not find a good segment length.
+            warnings.warn("Had trouble with segment length for subdivided segment %f to %f, object %s"
+                          % (ephs['time'][0], ephs['time'][-1], orbitObj.orbits.objId.iloc[0]))
+            self.failed += newCheby.failed
         newCheby.calcSegments()
         # Add subdivided segment values into tracked values here.
         for k in self.coeffs:

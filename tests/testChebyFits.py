@@ -31,20 +31,20 @@ class TestChebyFits(unittest.TestCase):
         for key in self.cheb.nCoeff:
             self.assertTrue(key in self.cheb.multipliers)
 
-    def testSetGranularity(self):
+    def testSetSegmentLength(self):
         # Expect MBAs with standard ngran and tolerance to have length ~2.0 days.
-        self.cheb.calcGranularity()
+        self.cheb.calcSegmentLength()
         self.assertAlmostEqual(self.cheb.length, 2.0)
         # Test that we can set it to other values which fit into the 30 day window.
-        self.cheb.calcGranularity(length=1.5)
+        self.cheb.calcSegmentLength(length=1.5)
         self.assertEqual(self.cheb.length, 1.5)
         # Test that we if we try to set it to a value which does not fit into the 30 day window,
         # that the actual value used is different - and smaller.
-        self.cheb.calcGranularity(length=1.9)
+        self.cheb.calcSegmentLength(length=1.9)
         self.assertTrue(self.cheb.length < 1.9)
         # Test that we get a warning about the residuals if we try to set the length to be too long.
         with warnings.catch_warnings(record=True) as w:
-            self.cheb.calcGranularity(length=5.0)
+            self.cheb.calcSegmentLength(length=5.0)
             self.assertTrue(len(w), 1)
         # Now check granularity works for other orbit types (which would have other standard lengths).
         # Check for multiple orbit types.
@@ -55,7 +55,7 @@ class TestChebyFits(unittest.TestCase):
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 5.0, 10.0, 100.0, 1000.0, 20000.0):
                 cheb.skyTolerance = skyTolerance
-                cheb.calcGranularity()
+                cheb.calcSegmentLength()
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
                 self.assertEqual((cheb.length * 100) % 1, 0)
@@ -68,14 +68,14 @@ class TestChebyFits(unittest.TestCase):
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 10.0, 100.0):
                 cheb.skyTolerance = skyTolerance
-                cheb.calcGranularity()
+                cheb.calcSegmentLength()
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
                 #print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
 
     def testSegments(self):
         # Test that we can create segments.
-        self.cheb.calcGranularity(length=1.0)
+        self.cheb.calcSegmentLength(length=1.0)
         times = self.cheb.getAllTimes()
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
@@ -92,7 +92,7 @@ class TestChebyFits(unittest.TestCase):
 
     def testWrite(self):
         # Test that we can write the output to files.
-        self.cheb.calcGranularity()
+        self.cheb.calcSegmentLength()
         self.cheb.generateEphemerides(self.cheb.getAllTimes())
         self.cheb.calcSegments()
         self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
@@ -121,9 +121,10 @@ class TestRun(unittest.TestCase):
         interval = 30
         cheb = ChebyFits(self.orbits, tStart, tStart + interval, ngran=64, skyTolerance=2.5, nDecimal=2)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
-        cheb.calcGranularity(length=10.0)
+        cheb.calcSegmentLength(length=10.0)
         # Run through segments.
         cheb.calcSegments()
+        self.assertEqual(len(np.unique(cheb.coeffs['objId'])), len(self.orbits))
         # Write outputs.
         cheb.write(self.coeffFile, self.residFile, self.failedFile)
         # Test that the segments for each individual object fit together start/end.
