@@ -122,24 +122,27 @@ class ChebyValues(object):
         Returns
         -------
         numpy.ndarray
-            The ephemeris positions for all objects.
+            The ephemeris positions for all objects. Note that these may be sorted in the same order as objIds.
         """
         ephemerides = {}
         if objIds is None:
-            objIds = np.unique(self.coeffs['objId'])
             objMatch = np.ones(len(self.coeffs['objId']), dtype=bool)
+            ephemerides['objId'] = np.unique(self.coeffs['objId'])
         else:
             if isinstance(objIds, str) or isinstance(objIds, int):
                 objIds = np.array([objIds])
             objMatch = np.in1d(self.coeffs['objId'], objIds)
-        ephemerides['objId'] = objIds
+            ephemerides['objId'] = objIds
+        ephemerides['time'] = np.zeros(len(ephemerides['objId']), float) + time
         for k in self.ephemerisKeys:
             ephemerides[k] = np.zeros(len(ephemerides['objId']), float)
         segments = np.where((self.coeffs['tStart'][objMatch] <= time) & (self.coeffs['tEnd'][objMatch] > time))[0]
         for i, segmentIdx in enumerate(segments):
-            if ephemerides['objId'][i] != self.coeffs['objId'][objMatch][segmentIdx]:
-                raise ValueError('Expected objIds to match .. are segments not unique in time?')
             ephemeris = self._evalSegment(segmentIdx, time, objMatch)
             for k in self.ephemerisKeys:
                 ephemerides[k][i] = ephemeris[k]
+            ephemerides['objId'][i] = self.coeffs['objId'][objMatch][segmentIdx]
+        if objIds is not None:
+            if set(ephemerides['objId']) != set(objIds):
+                raise ValueError('Expected to find match between objIds provided and ephemeride objIds, but did not')
         return ephemerides
