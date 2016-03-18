@@ -36,24 +36,24 @@ class TestPyOrbEphemerides(unittest.TestCase):
             emptyOrb.setOrbits(empty)
             self.ephems.setOrbits(emptyOrb)
 
-    def testConvertOorbArray(self):
+    def testConvertToOorbArray(self):
         # Check that orbital elements are converted.
         self.ephems.orbitObj = self.orbits
-        self.ephems._convertOorbElem()
+        self.ephems._convertToOorbElem()
         self.assertEqual(len(self.ephems.oorbElem), self.orbits.nSso)
         self.assertEqual(self.ephems.oorbElem[0][7], 2)
         self.assertEqual(self.ephems.oorbElem[0][9], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbits.orbits['q'][0])
         # Test that we can convert KEP orbital elements too.
         self.ephems.orbitObj = self.orbitsA
-        self.ephems._convertOorbElem()
+        self.ephems._convertToOorbElem()
         self.assertEqual(len(self.ephems.oorbElem), self.orbitsA.nSso)
         self.assertEqual(self.ephems.oorbElem[0][7], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsA.orbits['a'][0])
 
     def testConvertFromOorbArray(self):
         self.ephems.orbitObj = self.orbits
-        self.ephems._convertOorbElem()
+        self.ephems._convertToOorbElem()
         newOrbits = self.ephems._convertFromOorbElem(self.ephems.oorbElem)
         self.assertEqual(newOrbits, self.orbits)
 

@@ -46,9 +46,9 @@ class PyOrbEphemerides(object):
         if len(orbitObj) == 0:
             raise ValueError('There are no orbits in the Orbit instance.')
         self.orbitObj = orbitObj
-        self._convertOorbElem()
+        self._convertToOorbElem()
 
-    def _convertOorbElem(self):
+    def _convertToOorbElem(self):
         """Convert orbital elements into the numpy fortran-format array OpenOrb requires
         as input for ephemeris generation.
 
@@ -64,9 +64,9 @@ class PyOrbEphemerides(object):
         Sets self.oorbElem, the orbit parameters in an array formatted for OpenOrb.
         """
         # Add the appropriate element and epoch types:
-        orbids = np.arange(0, self.orbitObj.nSso, 1)
-        elem_type = np.zeros(self.orbitObj.nSso) + self.elemType[self.orbitObj.format]
-        epoch_scale = np.zeros(self.orbitObj.nSso) + self.timeScales['TT']
+        orbids = np.arange(0, len(self.orbitObj), 1)
+        elem_type = np.zeros(len(self.orbitObj)) + self.elemType[self.orbitObj.format]
+        epoch_scale = np.zeros(len(self.orbitObj)) + self.timeScales['TT']
         # Convert to format for pyoorb, INCLUDING converting inclination, node, argperi to RADIANS
         if self.orbitObj.format == 'KEP':
             oorbElem = np.column_stack((orbids, self.orbitObj.orbits['a'], self.orbitObj.orbits['e'],
