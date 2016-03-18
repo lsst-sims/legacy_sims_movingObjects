@@ -10,7 +10,6 @@ class Orbits(object):
     """
     def __init__(self):
         self.orbits = None
-        self.nSso = 0
         self.format = None
 
         # Specify the required columns/values in the self.orbits dataframe.
@@ -22,25 +21,19 @@ class Orbits(object):
                                 'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
 
     def __len__(self):
-        return self.nSso
+        return len(self.orbits)
 
     def __getitem__(self, i):
         orb = Orbits()
-        orb.setOrbits(self.orbits.query('index==@i'))
+        idx = i + self.orbits.index[0]
+        orb.setOrbits(self.orbits.query('index==@idx'))
         return orb
 
     def __iter__(self):
-        # Be sure to start iteration at starting point of orbits dataframe.
-        # The index value may not be 0 if we were using a subset pulled out of a previous orbits instance.
-        self.idx = self.orbits.index[0]
-        return self
-
-    def next(self):
-        if self.idx >= self.nSso:
-            raise StopIteration
-        idx = self.idx
-        self.idx += 1
-        return self.__getitem__(idx)
+        for i, orbit in self.orbits.iterrows():
+            orb = Orbits()
+            orb.setOrbits(orbit)
+            yield orb
 
     def __eq__(self, otherOrbits):
         if isinstance(otherOrbits, Orbits):
@@ -61,7 +54,7 @@ class Orbits(object):
     def setOrbits(self, orbits):
         """Set and validate orbital parameters contain all required values.
 
-        Sets self.orbits, self.format and self.nSso.
+        Sets self.orbits and self.format.
         If objid is not present in orbits, a sequential series of integers will be used.
         If H is not present in orbits, a default value of 20 will be used.
         If g is not present in orbits, a default value of 0.15 will be used.
@@ -86,7 +79,7 @@ class Orbits(object):
         if 'index' in orbits:
             del orbits['index']
 
-        self.nSso = len(orbits)
+        nSso = len(orbits)
 
         # Discover which type of orbital parameters we have on disk.
         format = None
@@ -106,13 +99,13 @@ class Orbits(object):
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
-            orbits['objId'] = np.arange(0, self.nSso, 1)
+            orbits['objId'] = np.arange(0, nSso, 1)
         if 'H' not in orbits:
-            orbits['H'] = np.zeros(self.nSso) + 20.0
+            orbits['H'] = np.zeros(nSso) + 20.0
         if 'g' not in orbits:
-            orbits['g'] = np.zeros(self.nSso) + 0.15
+            orbits['g'] = np.zeros(nSso) + 0.15
         if 'sed_filename' not in orbits:
-            sedvals = [sed for sed in repeat('C.dat', self.nSso)]
+            sedvals = [sed for sed in repeat('C.dat', nSso)]
             orbits['sed_filename'] = np.array(sedvals)
 
         # Make sure we gave all the columns we need.
@@ -122,7 +115,7 @@ class Orbits(object):
                                  % (col, self.format))
 
         # Check to see if we have duplicates.
-        if len(np.unique(orbits['objId'])) != self.nSso:
+        if len(np.unique(orbits['objId'])) != nSso:
             warnings.warn('There are duplicates in the orbit objId values' +
                           ' - was this intended? (continuing).')
         # All is good.

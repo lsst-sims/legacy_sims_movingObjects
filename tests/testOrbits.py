@@ -18,20 +18,23 @@ class TestOrbits(unittest.TestCase):
         orbits3 = Orbits()
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.assertNotEqual(orbits, orbits3)
-        orbits3 = orbits[0]
-        assert_frame_equal(orbits3.orbits, orbits.orbits.head(1))
-        for orb, (i, orbi) in zip(orbits, orbits.orbits.iterrows()):
-            self.assertEqual(orb.orbits['objId'].values[0], orbi['objId'])
-            self.assertTrue(isinstance(orb, Orbits))
 
     def testIterationAndIndexing(self):
         orbits = Orbits()
-        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
         orbitsSingle = orbits[0]
         assert_frame_equal(orbitsSingle.orbits, orbits.orbits.query('index==0'))
         orbitsSingle = orbits[3]
         assert_frame_equal(orbitsSingle.orbits, orbits.orbits.query('index==3'))
+        # Test iteration through all orbits.
         for orb, (i, orbi) in zip(orbits, orbits.orbits.iterrows()):
+            self.assertEqual(orb.orbits.objId.values[0], orbi.objId)
+            self.assertTrue(isinstance(orb, Orbits))
+            self.assertEqual(orb.orbits.index, i)
+        # Test iteration through a subset of orbits.
+        orbitsSub = Orbits()
+        orbitsSub.setOrbits(orbits.orbits.query('index > 4'))
+        for orb, (i, orbi) in zip(orbitsSub, orbitsSub.orbits.iterrows()):
             self.assertEqual(orb.orbits.objId.values[0], orbi.objId)
             self.assertTrue(isinstance(orb, Orbits))
             self.assertEqual(orb.orbits.index, i)
@@ -39,9 +42,9 @@ class TestOrbits(unittest.TestCase):
     def testReadOrbits(self):
         orbits = Orbits()
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
-        self.assertEqual(orbits.nSso, 4)
+        self.assertEqual(len(orbits), 4)
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
-        self.assertEqual(orbits.nSso, 4)
+        self.assertEqual(len(orbits), 4)
         with self.assertRaises(ValueError):
             orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsBad.des'))
 
@@ -52,28 +55,28 @@ class TestOrbits(unittest.TestCase):
         suborbits = orbits.orbits.head(1)
         newOrbits = Orbits()
         newOrbits.setOrbits(suborbits)
-        self.assertEqual(newOrbits.nSso, 1)
+        self.assertEqual(len(newOrbits), 1)
         self.assertEqual(newOrbits.format, 'COM')
         assert_frame_equal(newOrbits.orbits, suborbits)
         # Test that we can set the orbits using a Series.
         for i, sso in suborbits.iterrows():
             newOrbits = Orbits()
             newOrbits.setOrbits(sso)
-            self.assertEqual(newOrbits.nSso, 1)
+            self.assertEqual(len(newOrbits), 1)
             self.assertEqual(newOrbits.format, 'COM')
             assert_frame_equal(newOrbits.orbits, suborbits)
         # Test that we can set the orbits using a numpy array with many objects.
         numpyorbits = orbits.orbits.to_records(index=False)
         newOrbits = Orbits()
         newOrbits.setOrbits(numpyorbits)
-        self.assertEqual(newOrbits.nSso, orbits.nSso)
+        self.assertEqual(len(newOrbits), len(orbits))
         self.assertEqual(newOrbits.format, 'COM')
         assert_frame_equal(newOrbits.orbits, orbits.orbits)
         # And test that this works for a single row of the numpy array.
         onenumpyorbits = numpyorbits[0]
         newOrbits = Orbits()
         newOrbits.setOrbits(onenumpyorbits)
-        self.assertEqual(newOrbits.nSso, 1)
+        self.assertEqual(len(newOrbits), 1)
         self.assertEqual(newOrbits.format, 'COM')
         assert_frame_equal(newOrbits.orbits, suborbits)
         # And test that it fails appropriately when columns are not correct.
