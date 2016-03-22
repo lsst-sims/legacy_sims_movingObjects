@@ -40,14 +40,14 @@ class TestPyOrbEphemerides(unittest.TestCase):
         # Check that orbital elements are converted.
         self.ephems.orbitObj = self.orbits
         self.ephems._convertToOorbElem()
-        self.assertEqual(len(self.ephems.oorbElem), self.orbits.nSso)
+        self.assertEqual(len(self.ephems.oorbElem), len(self.orbits))
         self.assertEqual(self.ephems.oorbElem[0][7], 2)
         self.assertEqual(self.ephems.oorbElem[0][9], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbits.orbits['q'][0])
         # Test that we can convert KEP orbital elements too.
         self.ephems.orbitObj = self.orbitsA
         self.ephems._convertToOorbElem()
-        self.assertEqual(len(self.ephems.oorbElem), self.orbitsA.nSso)
+        self.assertEqual(len(self.ephems.oorbElem), len(self.orbitsA))
         self.assertEqual(self.ephems.oorbElem[0][7], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsA.orbits['a'][0])
 
@@ -84,7 +84,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
         # Group by object, and check grouping.
         ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
-        self.assertEqual(len(ephs), self.orbits.nSso)
+        self.assertEqual(len(ephs), len(self.orbits))
         # Group by time, and check grouping.
         ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
         self.assertEqual(len(ephs), len(times))
@@ -96,7 +96,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.ephems.setOrbits(self.orbitsA)
         oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
         ephsA = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
-        self.assertEqual(len(ephsA), self.orbitsA.nSso)
+        self.assertEqual(len(ephsA), len(self.orbitsA))
         ephsA = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
         self.assertEqual(len(ephsA), len(times))
         # Check that ephemerides calculated by each method are almost equal.
@@ -151,6 +151,8 @@ class TestJPLValues(unittest.TestCase):
         self.assertTrue(np.max(deltaDec) < 6)
         self.assertTrue(np.std(deltaRA) < 2)
         self.assertTrue(np.std(deltaDec) < 1)
+        print 'max JPL errors', np.max(deltaRA), np.max(deltaDec)
+        print 'std JPL errors', np.std(deltaRA), np.std(deltaDec)
 
 if __name__ == '__main__':
     unittest.main()
