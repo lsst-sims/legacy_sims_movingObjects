@@ -122,7 +122,7 @@ class ChebyValues(object):
         Returns
         -------
         numpy.ndarray
-            The ephemeris positions for all objects. Note that these may be sorted in the same order as objIds.
+            The ephemeris positions for all objects. Note that these may not be sorted in the same order as objIds.
         """
         ephemerides = {}
         if objIds is None:
