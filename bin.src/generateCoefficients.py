@@ -18,12 +18,15 @@ if __name__ == '__main__':
                         help="Length of timespan (specify this OR tEnd).")
     parser.add_argument("--skyTol", type=float, default=2.5,
                         help="Sky tolerance for position residuals; default 2.5 mas")
+    parser.add_argument("--nObj", type=int, default=None,
+                        help="If defined, then only nObj coefficients are calculated "
+                        "and written to disk at once.")
     parser.add_argument("--length", type=float, default=None,
                         help="Chebyshev polynomial length (will self-determine if not given).")
     parser.add_argument("--nDecimal", type=int, default=2,
-                        help="Number of decimal places to use for timespan.")
+                        help="Number of decimal places to use for timespan. Default 2.")
     parser.add_argument("--nCoeff", type=int, default=14,
-                        help="Number of coefficients to use for the position polynomials.")
+                        help="Number of coefficients to use for the position polynomials. Default 14.")
     parser.add_argument("--coeffFile", type=str, default=None,
                         help="Coefficient output file. Default is <orbitFile>_coeffs_tStart_tEnd.")
     args = parser.parse_args()
@@ -35,7 +38,7 @@ if __name__ == '__main__':
 
     if not os.path.isfile(args.orbitFile):
         print "Could not find orbit file %s" %(args.orbitFile)
-    if args.orbitFile.endswith('S3M'):
+    if args.orbitFile.lower().endswith('s3m'):
         skiprows = 1
     else:
         skiprows = 0
@@ -65,21 +68,34 @@ if __name__ == '__main__':
         else:
             tEnd = tStart + args.tSpan
 
-    # Fit chebyshev polynomials.
-    cheb = ChebyFits(orbits, tStart, tEnd, skyTolerance=args.skyTol,
-                     nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
-                     ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,
-                     obscode=807, timeScale='TAI')
-    cheb.calcGranularity(length=2.0)
-    cheb.calcSegments()
-
-    # Set output file names.
-    if args.coeffFile is not None:
-        coeffFile = args.coeffFile
+    if args.nObj is None:
+        nObj = len(orbits)
     else:
-        coeffFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_coeffs_%.2f_%.2f' % (tStart, tEnd)
-    residFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_resids_%.2f_%.2f' %(tStart, tEnd)
-    failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' %(tStart, tEnd)
+        nObj = args.nObj
 
-    # Write out coefficients.
-    cheb.write(coeffFile, residFile, failedFile, append=False)
+    # Cycle through nObj at once to fit and write data files.
+    append = False
+    for n in range(0, len(orbits), nObj):
+        subset = orbits.orbits[n:n + nObj]
+        subsetOrbits = Orbits()
+        subsetOrbits.setOrbits(subset)
+        # Fit chebyshev polynomials.
+        print "Working on objects %d to %d" % (n, n + nObj)
+        cheb = ChebyFits(subsetOrbits, tStart, tEnd, skyTolerance=args.skyTol,
+                         nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
+                         ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,
+                         obscode=807, timeScale='TAI')
+        cheb.calcSegmentLength(length=args.length)
+        cheb.calcSegments()
+
+        # Set output file names.
+        if args.coeffFile is not None:
+            coeffFile = args.coeffFile
+        else:
+            coeffFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_coeffs_%.2f_%.2f' % (tStart, tEnd)
+            residFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_resids_%.2f_%.2f' %(tStart, tEnd)
+            failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' %(tStart, tEnd)
+
+        # Write out coefficients.
+        cheb.write(coeffFile, residFile, failedFile, append=append)
+        append = True

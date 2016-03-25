@@ -490,7 +490,7 @@ class ChebyFits(object):
             Flag to append (or overwrite) the output files.
         """
         if append:
-            openMode = 'wa'
+            openMode = 'aw'
         else:
             openMode = 'w'
         # Write a header to the coefficients file, if writing to a new file:
