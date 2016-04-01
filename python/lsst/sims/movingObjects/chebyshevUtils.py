@@ -278,14 +278,14 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
         raise ValueError("length of x (%s) != length of t (%s)" % (len(x), nPoints))
     if dxdt is None:
         if nPoly >= nPoints:
-            raise RuntimeError('Without velocity constraints, nPoly must be less than %s' % (nPoints + 1))
+            raise RuntimeError('Without velocity constraints, nPoly (%d) must be less than %s' % (nPoly, nPoints + 1))
         if nPoly < 2:
-            raise RuntimeError('Without velocity constraints, nPoly must be greater than 2')
+            raise RuntimeError('Without velocity constraints, nPoly (%d) must be greater than 2' % nPoly)
     else:
         if nPoly >= 2 * (nPoints + 1):
-            raise RuntimeError('nPoly must be less than %s' % (2 * (nPoints + 1)))
+            raise RuntimeError('nPoly (%d) must be less than %s (%d)' % (nPoly, '2 * (nPoints + 1)', 2 * (nPoints + 1)))
         if nPoly < 4:
-            raise RuntimeError('nPoly must be greater than 4')
+            raise RuntimeError('nPoly (%d) must be greater than 4' % nPoly)
 
     # Recompute C1invX2 if xMultiplier and dxMultiplier are None or
     # they are not appropriate for sizes of input positions and velocities.
@@ -301,7 +301,7 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
         redoV = (dxMultiplier.shape[1] != nPoints) | (dxMultiplier.shape[0] != nPoly)
 
     if (dxdt is None) & redoX:
-        xMultiplier = makeChebMatrixOnlyX(nPoints, nPoly)
+        xMultiplier, _ = makeChebMatrixOnlyX(nPoints, nPoly)
 
     if (dxdt is not None) & (redoV | redoX):
         xMultiplier, dxMultiplier = makeChebMatrix(nPoints, nPoly)

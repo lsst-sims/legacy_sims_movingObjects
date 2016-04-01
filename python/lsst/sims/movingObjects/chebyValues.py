@@ -146,3 +146,6 @@ class ChebyValues(object):
             if set(ephemerides['objId']) != set(objIds):
                 raise ValueError('Expected to find match between objIds provided and ephemeride objIds, but did not')
         return ephemerides
+
+    def findObjectsInCircle(self, raCen, decCen, dRaDt=None, dDecDt=None, radius=1.75):
+        """Find the objects within radius of raCen/decCen."""

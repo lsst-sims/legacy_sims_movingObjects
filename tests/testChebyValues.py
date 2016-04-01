@@ -23,8 +23,8 @@ class TestChebyValues(unittest.TestCase):
         self.tStart = self.orbits.orbits.epoch.iloc[0]
         self.interval = 15
         self.nCoeffs = 14
-        self.chebyFits = ChebyFits(self.orbits, self.tStart, self.tStart+self.interval, ngran=64,
-                                   skyTolerance=2.5, nDecimal=2, nCoeff_position=self.nCoeffs, obscode=807)
+        self.chebyFits = ChebyFits(self.orbits, self.tStart, self.interval, ngran=64,
+                                   skyTolerance=2.5, nCoeff_position=self.nCoeffs, obscode=807)
         self.setLength = 0.5
         self.chebyFits.calcSegmentLength(length=self.setLength)
         self.chebyFits.calcSegments()
@@ -89,7 +89,7 @@ class TestChebyValues(unittest.TestCase):
         # Let's just look at the max residuals in all quantities.
         for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
             resids = np.abs(ephemerides[k] - pyephemerides[k][0])
-            print 'max diff ', k, np.max(resids)
+            print 'max diff', k, np.max(resids)
         resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'][0])
         print 'max diff elongation', np.max(resids)
         resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
@@ -118,11 +118,11 @@ class TestJPLValues(unittest.TestCase):
         self.residFile = 'test_resids'
         self.failedFile = 'test_failed'
         tStart = self.jpl['mjdTAI'].min() - 0.2
-        tEnd = np.max([self.jpl['mjdTAI'].max() + 0.2, tStart + 1])
-        self.chebyFits = ChebyFits(self.orbits, tStart, tEnd,
-                                   ngran=64, skyTolerance=2.5, nDecimal=14,
+        tSpan = 1.0
+        self.chebyFits = ChebyFits(self.orbits, tStart, tSpan,
+                                   ngran=64, skyTolerance=2.5,
                                    nCoeff_position=14, obscode=807)
-        self.chebyFits.calcSegmentLength()
+        self.chebyFits.calcSegmentLength(0.125)
         self.chebyFits.calcSegments()
         self.chebyFits.write(self.coeffFile, self.residFile, self.failedFile, append=False)
         self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']

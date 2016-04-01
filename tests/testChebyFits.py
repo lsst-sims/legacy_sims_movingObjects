@@ -10,8 +10,8 @@ class TestChebyFits(unittest.TestCase):
         self.testdir = 'orbits_testdata'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
-        self.cheb = ChebyFits(self.orbits, 54800, 54830, ngran=64, skyTolerance=2.5,
-                              nDecimal=2, nCoeff_position=14)
+        self.cheb = ChebyFits(self.orbits, 54800, 30, ngran=64, skyTolerance=2.5,
+                              nDecimal=10, nCoeff_position=14)
         self.assertEqual(self.cheb.ngran, 64)
 
     def tearDown(self):
@@ -51,7 +51,7 @@ class TestChebyFits(unittest.TestCase):
         for orbitFile in (['test_orbitsMBA.s3m', 'test_orbitsOuter.s3m', 'test_orbitsNEO.s3m']):
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
             tStart = self.orbits.orbits['epoch'].iloc[0]
-            cheb = ChebyFits(self.orbits, tStart, tStart + 30, ngran=64, nDecimal=2)
+            cheb = ChebyFits(self.orbits, tStart, 30, ngran=64, nDecimal=2)
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 5.0, 10.0, 100.0, 1000.0, 20000.0):
                 cheb.skyTolerance = skyTolerance
@@ -64,7 +64,7 @@ class TestChebyFits(unittest.TestCase):
         for orbitFile in (['test_orbitsImpactors.s3m']):
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
             tStart = self.orbits.orbits['epoch'].iloc[0]
-            cheb = ChebyFits(self.orbits, tStart, tStart + 30, ngran=64, nDecimal=10)
+            cheb = ChebyFits(self.orbits, tStart, 30, ngran=64, nDecimal=10)
             # And that we should converge for a variety of other tolerances.
             for skyTolerance in (2.5, 10.0, 100.0):
                 cheb.skyTolerance = skyTolerance
@@ -119,7 +119,7 @@ class TestRun(unittest.TestCase):
         # Set up chebyshev fitter.
         tStart = self.orbits.orbits.epoch.iloc[0]
         interval = 30
-        cheb = ChebyFits(self.orbits, tStart, tStart + interval, ngran=64, skyTolerance=2.5, nDecimal=2)
+        cheb = ChebyFits(self.orbits, tStart, interval, ngran=64, skyTolerance=2.5, nDecimal=10)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
         cheb.calcSegmentLength(length=10.0)
         # Run through segments.

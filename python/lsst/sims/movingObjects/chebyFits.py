@@ -37,10 +37,10 @@ class ChebyFits(object):
         The orbits for which to fit chebyshev polynomial coefficients.
     tStart : float
         The starting point in time to fit coefficients. MJD.
-    tEnd : float
-        The end point in time to fit coefficients. MJD.
+    tSpan : float
+        The time span (starting at tStart) to fit coefficients. Days.
     timeScale : {'TAI', 'UTC', 'TT'}
-        The timescale of the MJD times, tStart/tEnd, and the timeScale that should be
+        The timescale of the MJD time, tStart, and the timeScale that should be
         used with the chebyshev coefficients.
     obsCode : int, optional
         The observatory code of the location for which to generate ephemerides. Default 807 (CTIO).
@@ -61,13 +61,13 @@ class ChebyFits(object):
         The path to the JPL ephemeris file to use. Default is '$OORB_DATA/de405.dat'.
     nDecimal : int, optional
         The number of decimal places to allow in the segment length (and thus the times of the endpoints)
-        can be optionally limited to nDecimal places.
-        For the LSST SIMS moving object database, this should be 2 decimal places for non-NEOs, 14 for NEOs.
+        can be limited to nDecimal places. Default 10.
+        For the LSST SIMS moving object database, this should be 10 decimal places for all objects.
     """
-    def __init__(self, orbitsObj, tStart, tEnd, timeScale='TAI',
+    def __init__(self, orbitsObj, tStart, tSpan, timeScale='TAI',
                  obscode=807, skyTolerance=2.5,
                  nCoeff_position=14, nCoeff_vmag=9, nCoeff_delta=5,
-                 nCoeff_elongation=6, ngran=64, ephFile=None, nDecimal=None):
+                 nCoeff_elongation=6, ngran=64, ephFile=None, nDecimal=10):
         # Set up PyOrbEphemerides.
         if ephFile is None:
             self.ephFile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
@@ -77,8 +77,13 @@ class ChebyFits(object):
         # And then set orbits.
         self._setOrbits(orbitsObj)
         # Save input parameters.
-        self.tStart = tStart
-        self.tEnd = tEnd
+        # We have to play some games with the start and end times, using Decimal,
+        # in order to get the subdivision and times to match exactly, up to nDecimal places.
+        self.nDecimal = int(nDecimal)
+        self.tStart = round(tStart, self.nDecimal)
+        self.tSpan = round(tSpan, self.nDecimal)
+        self.tEnd = self.tStart + self.tSpan
+        #print 'input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix()
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
         elif timeScale.upper() == 'UTC':
@@ -90,12 +95,11 @@ class ChebyFits(object):
         self.obscode = obscode
         self.skyTolerance = skyTolerance
         self.nCoeff = {}
-        self.nCoeff['position'] = nCoeff_position
-        self.nCoeff['delta'] = nCoeff_delta
-        self.nCoeff['vmag'] = nCoeff_vmag
-        self.nCoeff['elongation'] = nCoeff_elongation
-        self.ngran = ngran
-        self.nDecimal = nDecimal  # 2 for MBA, 14 for NEO in LSST databases
+        self.nCoeff['position'] = int(nCoeff_position)
+        self.nCoeff['delta'] = int(nCoeff_delta)
+        self.nCoeff['vmag'] = int(nCoeff_vmag)
+        self.nCoeff['elongation'] = int(nCoeff_elongation)
+        self.ngran = int(ngran)
         # Precompute multipliers (we only do this once, instead of per segment).
         self._precomputeMultipliers()
         # Initialize attributes to save the coefficients and residuals.
@@ -131,13 +135,6 @@ class ChebyFits(object):
         self.multipliers['delta'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
         self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
 
-    def propagateOrbits(self, newEpoch):
-        """Not working yet -- pyoorb problem."""
-        raise NotImplementedError
-        """
-        self.pyephems.propagateOrbits(newEpoch)
-        """
-
     def getAllTimes(self):
         """Return an array of all times for all ephemerides, of all objects.
         """
@@ -146,6 +143,8 @@ class ChebyFits(object):
         except AttributeError:
             raise AttributeError('Need to set self.timestep first, using calcSegmentLength.')
         times = np.arange(self.tStart, self.tEnd + self.timestep / 2.0, self.timestep)
+        if len(times) % self.ngran != 1:
+            warnings.warn('Did not generate times corresponding to an number of segments - %d' % len(times))
         return times
 
     def generateEphemerides(self, times, byObject=True, verbose=False):
@@ -174,29 +173,25 @@ class ChebyFits(object):
         float
             The rounded length value.
         """
-        # Make length an integer value within the time interval.
-        timespan = self.tEnd - self.tStart
-        tolerance = 1.0e-30
-        if self.nDecimal is not None:
-            length = int(length * 10**(self.nDecimal)) / float(10**self.nDecimal)
-            tolerance = 10.**(-1*self.nDecimal - 1)
+        length = round(length, self.nDecimal)
+        length_in = length
+        # Make length an integer value within the time interval, to last decimal place accuracy.
+        tolerance = 10. ** (-1 * self.nDecimal)
         counter = 0
-        prev_int_factor = np.ceil(timespan / length)
-        while ((timespan % length) > tolerance) and (length > 0) and (counter < 100):
-            int_factor = np.ceil(timespan / length)
+        prev_int_factor = 0
+        while ((self.tSpan % length) > tolerance) and (length > 0) and (counter < 10):
+            int_factor = int(self.tSpan / length) + 1  # round up / ceiling
             if int_factor == prev_int_factor:
                 int_factor = prev_int_factor + 1
             prev_int_factor = int_factor
-            length = timespan / int_factor
-            if self.nDecimal is not None:
-                length = int(length * 10**(self.nDecimal)) / float(10**self.nDecimal)
+            length = round(self.tSpan / int_factor, self.nDecimal)
             counter += 1
-        if (timespan % length) > tolerance:
+        if (self.tSpan % length) > tolerance:
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find a suitable length for the timespan (%f to %f: D %f)'
-                             % (self.tStart, self.tEnd, self.tEnd-self.tStart))
+            raise ValueError('Could not find a suitable length for the timespan (start %f, span %f), starting with %f'
+                             % (self.tStart, self.tSpan, length_in))
         return length
 
     def _testResiduals(self, length, cutoff=99):
@@ -270,39 +265,36 @@ class ChebyFits(object):
         length = self._roundLength(length)
         # Check the resulting residuals.
         pos_resid, ratio = self._testResiduals(length)
-        counter = 1
-        # Now should be relatively close. Start to zero in using slope around the value.
+        counter = 0
+        # Now should be relatively close. Start to zero in using slope around the value.ngran
         while pos_resid > self.skyTolerance and counter <= maxIterations:
             if length > 6.0:
                 # In the high residual regime, look for wider gap to avoid fast swings in residual values.
                 y = length * 0.1
-                dy = y * 2
             elif length < 2.0:
                 # In the low residual regime, look for a small gap to avoid getting into the fast-rise.
                 y = length * 0.05
-                dy = y * 2
             else:
                 # In between, try to step by a day.
                 y = 1.0
-                dy = 2.0
             pos_resid = [0, 0]
             for i, l in enumerate([(length - y), (length + y)]):
                 pos_resid[i], ratio = self._testResiduals(l)
-            slope = dy / (pos_resid[1] - pos_resid[0])
-            length = slope * (self.skyTolerance - pos_resid[0]) + (length - y)
+            slope = y * 2 / (pos_resid[1] - pos_resid[0])
+            length = slope * (self.skyTolerance - pos_resid[0]) + length - y
             length = np.min([maxLength, length])
             length = self._roundLength(length)
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
-        pos_resid, ratio = self._testResiduals(length)
+        length = self._roundLength(length)
         self.length = length
         self.timestep = self.length / float(self.ngran)
         if counter > maxIterations:
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find appropriate segment length to meet skyTolerance within %d iterations'
-                             % maxIterations)
+            raise ValueError('Could not find appropriate segment length to meet skyTolerance %f within %d iterations'
+                             % (self.skyTolerance, maxIterations))
 
     def _getCoeffsPosition(self, ephs):
         """Calculate coefficients for the ra/dec values of a single objects ephemerides.
@@ -380,12 +372,20 @@ class ChebyFits(object):
             while tSegmentStart < self.tEnd:
                 # Identify the subset of times and ephemerides which are relevant for this segment
                 # (at the default segment size).
-                subset = np.where((times >= tSegmentStart) & (times <= (tSegmentStart + self.length)))
+                tSegmentEnd = round(tSegmentStart + self.length, self.nDecimal)
+                subset = np.where((times >= tSegmentStart) & (times <= tSegmentEnd))
+                if len(subset[0]) != self.ngran:
+                    warnings.warn('At %f/%f, selected unexpected number of ephemerides (%d)' % (tSegmentStart,
+                                                                                                tSegmentEnd,
+                                                                                                len(subset[0])))
                 self.calcOneSegment(orbitObj, e[subset])
-                tSegmentStart = tSegmentStart + self.length
+                tSegmentStart = tSegmentEnd
 
     def calcOneSegment(self, orbitObj, ephs):
         """Calculate the coefficients for a single Chebyshev segment, for a single object.
+
+        Calculates the coefficients and residuals, and saves this information to self.coeffs,
+        self.resids, and (if there are problems), self.failed.
 
         Parameters
         ----------
@@ -393,11 +393,6 @@ class ChebyFits(object):
             The single Orbits object we're fitting at the moment.
         ephs : numpy.ndarray
             The ephemerides we're fitting at the moment (for the single object / single segment).
-
-        Returns
-        -------
-        float, float
-            The start and end times of the segment that were actually fit.
         """
         objId = orbitObj.orbits.objId.iloc[0]
         tSegmentStart = ephs['time'][0]
@@ -407,8 +402,7 @@ class ChebyFits(object):
             #print 'subdividing segments', orbitObj.orbits.objId.iloc[0]
             self._subdivideSegment(orbitObj, ephs)
         else:
-            #print self.length, len(ephs['magV']), len(ephs['time']),
-            #print self.multipliers['delta'][0].shape, self.multipliers['vmag'][0].shape, self.multipliers['elongation'][0].shape
+            #print 'working on ', orbitObj.orbits.objId.iloc[0], 'at times', tSegmentStart, tSegmentEnd
             coeffs, max_resids = self._getCoeffsOther(ephs)
             fitFailed = False
             for k in max_resids:
@@ -452,11 +446,12 @@ class ChebyFits(object):
         float, float
             The start and end times of the segment that were actually fit.
         """
-        newCheby = ChebyFits(orbitObj, ephs['time'][0], ephs['time'][-1],
+        newCheby = ChebyFits(orbitObj, ephs['time'][0], (ephs['time'][-1] - ephs['time'][0]),
                              timeScale=self.timeScale, obscode=self.obscode,
                              skyTolerance=self.skyTolerance,
                              nCoeff_position=self.nCoeff['position'],
-                             nCoeff_vmag=self.nCoeff['vmag'], nCoeff_delta=self.nCoeff['delta'],
+                             nCoeff_vmag=self.nCoeff['vmag'],
+                             nCoeff_delta=self.nCoeff['delta'],
                              nCoeff_elongation=self.nCoeff['elongation'],
                              ngran=self.ngran, ephFile=self.ephFile,
                              nDecimal=self.nDecimal)
@@ -503,6 +498,7 @@ class ChebyFits(object):
             header += ' '.join(['elongation_%d' % x for x in range(self.nCoeff['elongation'])])
         else:
             header = None
+        timeformat = '%.' + '%s' % self.nDecimal + 'f'
         with open(coeffFile, openMode) as f:
             if header is not None:
                 print >>f, header
@@ -514,7 +510,7 @@ class ChebyFits(object):
                                                                                         self.coeffs['delta'],
                                                                                         self.coeffs['vmag'],
                                                                                         self.coeffs['elongation'])):
-                print >>f, "%s %.10f %.10f %s %s %s %s %s" % (objId, tStart, tEnd,
+                print >>f, "%s %s %s %s %s %s %s %s" % (objId, timeformat % tStart, timeformat % tEnd,
                                                               " ".join('%.14e' % j for j in cRa),
                                                               " ".join('%.14e' % j for j in cDec),
                                                               " ".join('%.7e' % j for j in cDelta),
