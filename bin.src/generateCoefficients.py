@@ -23,8 +23,8 @@ if __name__ == '__main__':
                         "and written to disk at once.")
     parser.add_argument("--length", type=float, default=None,
                         help="Chebyshev polynomial length (will self-determine if not given).")
-    parser.add_argument("--nDecimal", type=int, default=2,
-                        help="Number of decimal places to use for timespan. Default 2.")
+    parser.add_argument("--nDecimal", type=int, default=10,
+                        help="Number of decimal places to use for timespan. Default 10.")
     parser.add_argument("--nCoeff", type=int, default=14,
                         help="Number of coefficients to use for the position polynomials. Default 14.")
     parser.add_argument("--coeffFile", type=str, default=None,
@@ -61,12 +61,14 @@ if __name__ == '__main__':
 
     if args.tEnd is not None:
         tEnd = args.tEnd
+        tSpan = tEnd - tStart
     else:
         if args.tSpan is None:
+            tSpan = 30
             print "Neither tEnd nor tSpan was specified: using 30 days."
-            tEnd = tStart + 30
         else:
-            tEnd = tStart + args.tSpan
+            tSpan = args.tSpan
+        tEnd = tStart + tSpan
 
     if args.nObj is None:
         nObj = len(orbits)
@@ -81,7 +83,7 @@ if __name__ == '__main__':
         subsetOrbits.setOrbits(subset)
         # Fit chebyshev polynomials.
         print "Working on objects %d to %d" % (n, n + nObj)
-        cheb = ChebyFits(subsetOrbits, tStart, tEnd, skyTolerance=args.skyTol,
+        cheb = ChebyFits(subsetOrbits, tStart, tSpan, skyTolerance=args.skyTol,
                          nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
                          ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,
                          obscode=807, timeScale='TAI')
