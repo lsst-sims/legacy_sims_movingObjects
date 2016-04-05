@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import warnings
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 
@@ -75,6 +76,14 @@ if __name__ == '__main__':
     else:
         nObj = args.nObj
 
+    # Set output file names.
+    if args.coeffFile is not None:
+        coeffFile = args.coeffFile
+    else:
+        coeffFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_coeffs_%.2f_%.2f' % (tStart, tEnd)
+    residFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_resids_%.2f_%.2f' % (tStart, tEnd)
+    failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' % (tStart, tEnd)
+
     # Cycle through nObj at once to fit and write data files.
     append = False
     for n in range(0, len(orbits), nObj):
@@ -87,16 +96,28 @@ if __name__ == '__main__':
                          nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
                          ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,
                          obscode=807, timeScale='TAI')
-        cheb.calcSegmentLength(length=args.length)
-        cheb.calcSegments()
 
-        # Set output file names.
-        if args.coeffFile is not None:
-            coeffFile = args.coeffFile
-        else:
-            coeffFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_coeffs_%.2f_%.2f' % (tStart, tEnd)
-            residFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_resids_%.2f_%.2f' %(tStart, tEnd)
-            failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + '_failed_%.2f_%.2f' %(tStart, tEnd)
+        try:
+            cheb.calcSegmentLength(length=args.length)
+        except ValueError as ve:
+            cheb.length = None
+            for objId in subsetOrbits.orbits['objId'].as_matrix():
+                cheb.failed.append((objId, tStart, tEnd))
+            warnings.warn('Objid %s to %s (n %d to %d), segment %f to %f - error: %s'
+                          % (subsetOrbits.orbits.objId.iloc[0], subsetOrbits.orbits.objId.iloc[-1],
+                             n, n + nObj, tStart, tEnd, ve.message))
+
+        # Put this in a separate try/except block, because errors here can mask errors in the previous
+        # length determination stage otherwise.
+        if cheb.length is not None:
+            try:
+                cheb.calcSegments()
+            except ValueError as ve:
+                for objId in subsetOrbits.orbits['objId'].as_matrix():
+                    cheb.failed.append((objId, tStart, tEnd))
+                warnings.warn('Objid %s to %s (n %d to %d), segment %f to %f - error: %s'
+                              % (subsetOrbits.orbits.objId.iloc[0], subsetOrbits.orbits.objId.iloc[-1],
+                                 n, n + nObj, tStart, tEnd, ve.message))
 
         # Write out coefficients.
         cheb.write(coeffFile, residFile, failedFile, append=append)
