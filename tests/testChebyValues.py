@@ -122,12 +122,13 @@ class TestJPLValues(unittest.TestCase):
         self.chebyFits = ChebyFits(self.orbits, tStart, tSpan,
                                    ngran=64, skyTolerance=2.5,
                                    nCoeff_position=14, obscode=807)
-        self.chebyFits.calcSegmentLength(0.125)
+        self.chebyFits.calcSegmentLength()
         self.chebyFits.calcSegments()
         self.chebyFits.write(self.coeffFile, self.residFile, self.failedFile, append=False)
         self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
         self.chebyValues = ChebyValues()
         self.chebyValues.readCoefficients(self.coeffFile)
+        #self.chebyValues.setCoefficients(self.chebyFits)
 
     def tearDown(self):
         del self.orbits
@@ -148,19 +149,27 @@ class TestJPLValues(unittest.TestCase):
             j = self.jpl[np.where(self.jpl['mjdTAI'] == t)]
             ephs = self.chebyValues.getEphemerides(t, j['objId'])
             ephorder = np.argsort(ephs['objId'])
-            dRA = np.abs(ephs['ra'][ephorder] - j['ra_deg']) * 3600.0 * 1000.0
-            dDec = np.abs(ephs['dec'][ephorder] - j['dec_deg']) * 3600.0 * 1000.0
+            jorder = np.argsort(j['objId'])
+            jorder = np.arange(0, len(jorder))
+            dRA = np.abs(ephs['ra'][ephorder] - j['ra_deg'][jorder]) * 3600.0 * 1000.0
+            dDec = np.abs(ephs['dec'][ephorder] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
             deltaRA[i] = dRA.max()
             deltaDec[i] = dDec.max()
+            if deltaRA[i] > 18:
+                print j['objId'], ephs['objId']
+                print j['ra_deg']
+                print ephs['ra']
+                print j['dec_deg']
+                print ephs['dec']
         # Should be (given OOrb direct prediction):
         # Much of the time we're closer than 1mas, but there are a few which hit higher values.
         # This is consistent with the errors/values reported by oorb directly in testEphemerides.
+        print 'max JPL errors', deltaRA.max(), deltaDec.max()
+        print 'std of JPL errors', np.std(deltaRA), np.std(deltaDec)
         self.assertTrue(np.max(deltaRA) < 18)
         self.assertTrue(np.max(deltaDec) < 6)
         self.assertTrue(np.std(deltaRA) < 2)
         self.assertTrue(np.std(deltaDec) < 1)
-        print 'max JPL errors', deltaRA.max(), deltaDec.max()
-        print 'std of JPL errors', np.std(deltaRA), np.std(deltaDec)
 
 if __name__ == '__main__':
     unittest.main()
