@@ -149,3 +149,5 @@ class ChebyValues(object):
 
     def findObjectsInCircle(self, raCen, decCen, dRaDt=None, dDecDt=None, radius=1.75):
         """Find the objects within radius of raCen/decCen."""
+        #x, y, z =
+        pass

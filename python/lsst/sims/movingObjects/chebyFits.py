@@ -143,8 +143,6 @@ class ChebyFits(object):
         except AttributeError:
             raise AttributeError('Need to set self.timestep first, using calcSegmentLength.')
         times = np.arange(self.tStart, self.tEnd + self.timestep / 2.0, self.timestep)
-        if len(times) % self.ngran != 1:
-            warnings.warn('Did not generate times corresponding to an number of segments - %d' % len(times))
         return times
 
     def generateEphemerides(self, times, byObject=True, verbose=False):
@@ -179,19 +177,20 @@ class ChebyFits(object):
         tolerance = 10. ** (-1 * self.nDecimal)
         counter = 0
         prev_int_factor = 0
-        while ((self.tSpan % length) > tolerance) and (length > 0) and (counter < 10):
+        while ((self.tSpan % length) > tolerance) and (length > 0) and (counter < 20):
             int_factor = int(self.tSpan / length) + 1  # round up / ceiling
             if int_factor == prev_int_factor:
                 int_factor = prev_int_factor + 1
             prev_int_factor = int_factor
             length = round(self.tSpan / int_factor, self.nDecimal)
             counter += 1
-        if (self.tSpan % length) > tolerance:
+        if (self.tSpan % length) > tolerance or (length <= 0):
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find a suitable length for the timespan (start %f, span %f), starting with %f'
-                             % (self.tStart, self.tSpan, length_in))
+            raise ValueError('Could not find a suitable length for the timespan (start %f, span %f), '
+                             'starting with %s, ending at %f'
+                             % (self.tStart, self.tSpan, str(length_in), length))
         return length
 
     def _testResiduals(self, length, cutoff=99):
@@ -248,7 +247,7 @@ class ChebyFits(object):
         #    when the residuals resume ~linear growth out to 70 day segments if ngran=128)
         # Make an arbitrary cap on segment length at 60 days, (25000 mas) ~.5 arcminute accuracy.
         maxLength = 60
-        maxIterations = 100
+        maxIterations = 50
         if self.skyTolerance < 5:
             # This is the cap of the low-linearity regime, looping below will refine this value.
             length = 2.0
@@ -267,34 +266,21 @@ class ChebyFits(object):
         pos_resid, ratio = self._testResiduals(length)
         counter = 0
         # Now should be relatively close. Start to zero in using slope around the value.ngran
-        while pos_resid > self.skyTolerance and counter <= maxIterations:
-            if length > 6.0:
-                # In the high residual regime, look for wider gap to avoid fast swings in residual values.
-                y = length * 0.1
-            elif length < 2.0:
-                # In the low residual regime, look for a small gap to avoid getting into the fast-rise.
-                y = length * 0.05
-            else:
-                # In between, try to step by a day.
-                y = 1.0
-            pos_resid = [0, 0]
-            for i, l in enumerate([(length - y), (length + y)]):
-                pos_resid[i], ratio = self._testResiduals(l)
-            slope = y * 2 / (pos_resid[1] - pos_resid[0])
-            length = slope * (self.skyTolerance - pos_resid[0]) + length - y
-            length = np.min([maxLength, length])
+        while pos_resid > self.skyTolerance and counter <= maxIterations and length > 0:
+            length = length / 2.0
             length = self._roundLength(length)
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
-        length = self._roundLength(length)
-        self.length = length
-        self.timestep = self.length / float(self.ngran)
-        if counter > maxIterations:
+            #print counter, length, pos_resid, ratio
+        if counter > maxIterations or length <= 0:
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
             raise ValueError('Could not find appropriate segment length to meet skyTolerance %f within %d iterations'
                              % (self.skyTolerance, maxIterations))
+        else:
+            self.length = length
+            self.timestep = self.length / float(self.ngran)
 
     def _getCoeffsPosition(self, ephs):
         """Calculate coefficients for the ra/dec values of a single objects ephemerides.
@@ -374,10 +360,6 @@ class ChebyFits(object):
                 # (at the default segment size).
                 tSegmentEnd = round(tSegmentStart + self.length, self.nDecimal)
                 subset = np.where((times >= tSegmentStart) & (times <= tSegmentEnd))
-                if len(subset[0]) != self.ngran:
-                    warnings.warn('At %f/%f, selected unexpected number of ephemerides (%d)' % (tSegmentStart,
-                                                                                                tSegmentEnd,
-                                                                                                len(subset[0])))
                 self.calcOneSegment(orbitObj, e[subset])
                 tSegmentStart = tSegmentEnd
 
@@ -440,11 +422,6 @@ class ChebyFits(object):
             The single Orbits object we're fitting at the moment.
         ephs : numpy.ndarray
             The ephemerides we're fitting at the moment (for the single object / single segment).
-
-        Returns
-        -------
-        float, float
-            The start and end times of the segment that were actually fit.
         """
         newCheby = ChebyFits(orbitObj, ephs['time'][0], (ephs['time'][-1] - ephs['time'][0]),
                              timeScale=self.timeScale, obscode=self.obscode,
@@ -457,11 +434,12 @@ class ChebyFits(object):
                              nDecimal=self.nDecimal)
         try:
             newCheby.calcSegmentLength()
-        except ValueError:
+        except ValueError as ve:
             # Could not find a good segment length.
-            warnings.warn("Had trouble with segment length for subdivided segment %f to %f, object %s"
-                          % (ephs['time'][0], ephs['time'][-1], orbitObj.orbits.objId.iloc[0]))
+            warnings.warn('Objid %s, segment %f to %f - error:'
+                          % (orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1], ve.message))
             self.failed += newCheby.failed
+            return
         newCheby.calcSegments()
         # Add subdivided segment values into tracked values here.
         for k in self.coeffs:
@@ -533,5 +511,5 @@ class ChebyFits(object):
 
         if len(self.failed) > 0:
             with open(failedFile, openMode) as f:
-                for i, failed in enumerate(self.cheb.failed):
-                    print >>f, failed
+                for i, failed in enumerate(self.failed):
+                    print >>f, ' '.join([str(x) for x in failed])
