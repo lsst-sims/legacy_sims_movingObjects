@@ -8,12 +8,12 @@ from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
 from lsst.sims.movingObjects import ChebyFits
 from lsst.sims.movingObjects import ChebyValues
-from eups import productDir
+import lsst.utils.getPackageDir as getPackageDir
 
 
 class TestChebyValues(unittest.TestCase):
     def setUp(self):
-        self.testdatadir = os.path.join(productDir('sims_movingObjects'), 'tests/orbits_testdata')
+        self.testdatadir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.coeffFile = 'test_coeffs'
         self.residFile = 'test_resids'
         self.failedFile = 'test_failed'
@@ -110,7 +110,7 @@ class TestJPLValues(unittest.TestCase):
     def setUp(self):
         # Read orbits.
         self.orbits = Orbits()
-        self.jplDir = os.path.join(productDir('sims_movingObjects'), 'tests/jpl_testdata')
+        self.jplDir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/jpl_testdata')
         self.orbits.readOrbits(os.path.join(self.jplDir, 'S0_n747.des'), skiprows=1)
         # Read JPL ephems.
         self.jpl = pd.read_table(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)

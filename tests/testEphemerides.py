@@ -6,12 +6,12 @@ from astropy.time import Time
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
-from eups import productDir
+import lsst.utils.getPackageDir as getPackageDir
 
 
 class TestPyOrbEphemerides(unittest.TestCase):
     def setUp(self):
-        self.testdir = os.path.join(productDir('sims_movingObjects'), 'tests/orbits_testdata')
+        self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.orbitsA = Orbits()
@@ -117,7 +117,7 @@ class TestJPLValues(unittest.TestCase):
     def setUp(self):
         # Read orbits.
         self.orbits = Orbits()
-        self.jplDir = os.path.join(productDir('sims_movingObjects'), 'tests/jpl_testdata')
+        self.jplDir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/jpl_testdata')
         self.orbits.readOrbits(os.path.join(self.jplDir, 'S0_n747.des'), skiprows=1)
         # Read JPL ephems.
         self.jpl = pd.read_table(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)
