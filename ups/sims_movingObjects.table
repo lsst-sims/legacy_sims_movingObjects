@@ -3,8 +3,7 @@ setupRequired(numpy)
 setupRequired(oorb)
 
 # other requirements (not in LSST stack)
-# both are supplied by Anaconda
-# scipy
+# supplied by ana/mini-conda.
 # pandas
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
