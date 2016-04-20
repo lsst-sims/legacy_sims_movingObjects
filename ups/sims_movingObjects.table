@@ -5,7 +5,7 @@ setupRequired(oorb)
 # other requirements (not in LSST stack)
 # both are supplied by Anaconda
 # scipy
-# sqlalchemy 
+# pandas
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)

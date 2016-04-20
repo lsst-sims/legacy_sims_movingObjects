@@ -4,10 +4,12 @@ import warnings
 import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
+from eups import productDir
+
 
 class TestChebyFits(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'orbits_testdata'
+        self.testdir = os.path.join(productDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.cheb = ChebyFits(self.orbits, 54800, 30, ngran=64, skyTolerance=2.5,
@@ -101,7 +103,7 @@ class TestChebyFits(unittest.TestCase):
 
 class TestRun(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'orbits_testdata'
+        self.testdir = os.path.join(productDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.coeffFile = 'tmpCoeff'

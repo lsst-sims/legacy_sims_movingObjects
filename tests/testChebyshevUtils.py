@@ -1,8 +1,9 @@
+import os
 import numpy as np
 import lsst.sims.movingObjects.chebyshevUtils as chebyUtils
 import pickle
-
 import unittest
+from eups import productDir
 
 
 class TestChebgrid(unittest.TestCase):
@@ -10,7 +11,7 @@ class TestChebgrid(unittest.TestCase):
     def setUp(self):
         self.mbaDict = {}
         for day in range(2, 4):
-            self.mbaDict[day] = pickle.load(open("cheb_testdata/day%i.pkl" % (day), "rb"))
+            self.mbaDict[day] = pickle.load(open(os.path.join(productDir('sims_movingObjects'), "tests/cheb_testdata/day%i.pkl" % (day)), "rb"))
 
     def test_raise_error(self):
         x = np.linspace(-1, 1, 9)
