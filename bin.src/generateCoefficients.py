@@ -6,6 +6,7 @@ import warnings
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generate Chebyshev polynomial coefficients" +
                                      " for a set of orbits, over a given timespan.")
@@ -38,7 +39,7 @@ if __name__ == '__main__':
         exit()
 
     if not os.path.isfile(args.orbitFile):
-        print "Could not find orbit file %s" %(args.orbitFile)
+        print "Could not find orbit file %s" % (args.orbitFile)
     if args.orbitFile.lower().endswith('s3m'):
         skiprows = 1
     else:
@@ -51,7 +52,7 @@ if __name__ == '__main__':
     # Parse start, end and timespan values.
     if args.tStart is None:
         tStart = orbits.orbits.epoch.iloc[0]
-        print "tStart was not specified: using the first epoch in the orbits file: %f" %(tStart)
+        print "tStart was not specified: using the first epoch in the orbits file: %f" % (tStart)
     else:
         tStart = args.tStart
 

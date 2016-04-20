@@ -11,7 +11,8 @@ class TestChebgrid(unittest.TestCase):
     def setUp(self):
         self.mbaDict = {}
         for day in range(2, 4):
-            self.mbaDict[day] = pickle.load(open(os.path.join(productDir('sims_movingObjects'), "tests/cheb_testdata/day%i.pkl" % (day)), "rb"))
+            self.mbaDict[day] = pickle.load(open(os.path.join(productDir('sims_movingObjects'),
+                                                              "tests/cheb_testdata/day%i.pkl" % (day)), "rb"))
 
     def test_raise_error(self):
         x = np.linspace(-1, 1, 9)
@@ -64,7 +65,8 @@ class TestChebgrid(unittest.TestCase):
         y = np.sin(x)
         dy = np.cos(x)
         xmatrix, dxmatrix = chebyUtils.makeChebMatrix(NPOINTS + 1, NPOLY)
-        p, resid, rms, maxresid = chebyUtils.chebfit(x, y, dy, xMultiplier=xmatrix, dxMultiplier=dxmatrix, nPoly=NPOLY)
+        p, resid, rms, maxresid = chebyUtils.chebfit(x, y, dy, xMultiplier=xmatrix,
+                                                     dxMultiplier=dxmatrix, nPoly=NPOLY)
         yy, vv = chebyUtils.chebeval(x, p, interval=np.array([0, np.pi]))
         self.assertTrue(np.allclose(yy, y, rtol=1e-13))
         self.assertTrue(np.allclose(vv, dy, rtol=1e-13))
@@ -79,8 +81,9 @@ class TestChebgrid(unittest.TestCase):
             rap, ra_resid, ra_rms, maxresid = chebyUtils.chebfit(self.mbaDict[day]['t'],
                                                                  self.mbaDict[day]['ra'],
                                                                  (self.mbaDict[day]['dradt'] /
-                                                                  np.cos(np.pi * self.mbaDict[day]['dec'] / 180.)),
-                                                                  nPoly=self.mbaDict[day]['coeff'])
+                                                                  np.cos(np.pi *
+                                                                         self.mbaDict[day]['dec'] / 180.)),
+                                                                 nPoly=self.mbaDict[day]['coeff'])
             self.assertTrue(np.allclose(self.mbaDict[day]['rap'], rap))
             self.assertTrue(np.allclose(self.mbaDict[day]['ra_resid'], ra_resid))
             self.assertTrue(np.allclose(self.mbaDict[day]['ra_rms'], ra_rms))

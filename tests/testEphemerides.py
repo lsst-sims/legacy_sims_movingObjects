@@ -111,6 +111,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         for column in ephsAll.dtype.names:
             np.testing.assert_almost_equal(ephsAllA[column], ephsAll[column])
 
+
 class TestJPLValues(unittest.TestCase):
     """Test the oorb generated RA/Dec values against JPL generated RA/Dec values."""
     def setUp(self):
@@ -156,6 +157,7 @@ class TestJPLValues(unittest.TestCase):
         self.assertTrue(np.std(deltaDec) < 1)
         print 'max JPL errors', np.max(deltaRA), np.max(deltaDec)
         print 'std JPL errors', np.std(deltaRA), np.std(deltaDec)
+
 
 if __name__ == '__main__':
     unittest.main()

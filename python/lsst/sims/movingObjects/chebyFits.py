@@ -7,11 +7,13 @@ from .ephemerides import PyOrbEphemerides
 
 __all__ = ['ChebyFits']
 
+
 def three_sixty_to_neg(ra):
     """Wrap discontiguous RA values into more-contiguous results."""
     if (ra.min() < 100) and (ra.max() > 270):
         ra = np.where(ra > 270, ra - 360, ra)
     return ra
+
 
 class ChebyFits(object):
     """Generates chebyshev coefficients for a provided set of orbits.
@@ -83,7 +85,7 @@ class ChebyFits(object):
         self.tStart = round(tStart, self.nDecimal)
         self.tSpan = round(tSpan, self.nDecimal)
         self.tEnd = self.tStart + self.tSpan
-        #print 'input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix()
+        # print 'input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix()
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
         elif timeScale.upper() == 'UTC':
@@ -271,12 +273,12 @@ class ChebyFits(object):
             length = self._roundLength(length)
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
-            #print counter, length, pos_resid, ratio
+            # print counter, length, pos_resid, ratio
         if counter > maxIterations or length <= 0:
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find appropriate segment length to meet skyTolerance %f within %d iterations'
+            raise ValueError('Could not find good segment length to meet skyTolerance %f within %d iterations'
                              % (self.skyTolerance, maxIterations))
         else:
             self.length = length
@@ -302,17 +304,16 @@ class ChebyFits(object):
             The positional error residuals between fit and ephemeris values, in mas.
         """
         dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
-        coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = cheb.chebfit(ephs['time'],
-                                                                      three_sixty_to_neg(ephs['ra']),
-                                                                      dxdt=dradt_coord,
-                                                                      xMultiplier=self.multipliers['position'][0],
-                                                                      dxMultiplier=self.multipliers['position'][1],
-                                                                      nPoly=self.nCoeff['position'])
-        coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = cheb.chebfit(ephs['time'], ephs['dec'],
-                                                                          dxdt=ephs['ddecdt'],
-                                                                          xMultiplier=self.multipliers['position'][0],
-                                                                          dxMultiplier=self.multipliers['position'][1],
-                                                                          nPoly=self.nCoeff['position'])
+        coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = \
+            cheb.chebfit(ephs['time'], three_sixty_to_neg(ephs['ra']), dxdt=dradt_coord,
+                         xMultiplier=self.multipliers['position'][0],
+                         dxMultiplier=self.multipliers['position'][1],
+                         nPoly=self.nCoeff['position'])
+        coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = \
+            cheb.chebfit(ephs['time'], ephs['dec'], dxdt=ephs['ddecdt'],
+                         xMultiplier=self.multipliers['position'][0],
+                         dxMultiplier=self.multipliers['position'][1],
+                         nPoly=self.nCoeff['position'])
         max_pos_resid = np.max(np.sqrt(resid_dec**2 +
                                        (resid_ra * np.cos(np.radians(ephs['dec'])))**2))
         # Convert position residuals to mas.
@@ -381,10 +382,10 @@ class ChebyFits(object):
         tSegmentEnd = ephs['time'][-1]
         coeff_ra, coeff_dec, max_pos_resid = self._getCoeffsPosition(ephs)
         if max_pos_resid > self.skyTolerance:
-            #print 'subdividing segments', orbitObj.orbits.objId.iloc[0]
+            # print 'subdividing segments', orbitObj.orbits.objId.iloc[0]
             self._subdivideSegment(orbitObj, ephs)
         else:
-            #print 'working on ', orbitObj.orbits.objId.iloc[0], 'at times', tSegmentStart, tSegmentEnd
+            # print 'working on ', orbitObj.orbits.objId.iloc[0], 'at times', tSegmentStart, tSegmentEnd
             coeffs, max_resids = self._getCoeffsOther(ephs)
             fitFailed = False
             for k in max_resids:
@@ -480,29 +481,24 @@ class ChebyFits(object):
         with open(coeffFile, openMode) as f:
             if header is not None:
                 print >>f, header
-            for i, (objId, tStart, tEnd, cRa, cDec, cDelta, cVmag, cE) in enumerate(zip(self.coeffs['objId'],
-                                                                                        self.coeffs['tStart'],
-                                                                                        self.coeffs['tEnd'],
-                                                                                        self.coeffs['ra'],
-                                                                                        self.coeffs['dec'],
-                                                                                        self.coeffs['delta'],
-                                                                                        self.coeffs['vmag'],
-                                                                                        self.coeffs['elongation'])):
+            for i, (objId, tStart, tEnd, cRa, cDec, cDelta, cVmag, cE) in \
+                    enumerate(zip(self.coeffs['objId'], self.coeffs['tStart'],
+                                  self.coeffs['tEnd'], self.coeffs['ra'],
+                                  self.coeffs['dec'], self.coeffs['delta'],
+                                  self.coeffs['vmag'], self.coeffs['elongation'])):
                 print >>f, "%s %s %s %s %s %s %s %s" % (objId, timeformat % tStart, timeformat % tEnd,
-                                                              " ".join('%.14e' % j for j in cRa),
-                                                              " ".join('%.14e' % j for j in cDec),
-                                                              " ".join('%.7e' % j for j in cDelta),
-                                                              " ".join('%.7e' % j for j in cVmag),
-                                                              " ".join('%.7e' % j for j in cE))
+                                                        " ".join('%.14e' % j for j in cRa),
+                                                        " ".join('%.14e' % j for j in cDec),
+                                                        " ".join('%.7e' % j for j in cDelta),
+                                                        " ".join('%.7e' % j for j in cVmag),
+                                                        " ".join('%.7e' % j for j in cE))
 
         with open(residFile, openMode) as f:
-            for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in enumerate(zip(self.resids['objId'],
-                                                                                   self.resids['tStart'],
-                                                                                   self.resids['tEnd'],
-                                                                                   self.resids['pos'],
-                                                                                   self.resids['delta'],
-                                                                                   self.resids['vmag'],
-                                                                                   self.resids['elongation'])):
+            for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in \
+                    enumerate(zip(self.resids['objId'], self.resids['tStart'],
+                                  self.resids['tEnd'], self.resids['pos'],
+                                  self.resids['delta'], self.resids['vmag'],
+                                  self.resids['elongation'])):
                 print >> f, "%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e" % (objId, i + 1,
                                                                                  tStart, tEnd,
                                                                                  (tEnd - tStart),

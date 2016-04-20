@@ -7,10 +7,13 @@ import pyoorb as oo
 from .orbits import Orbits
 
 import time
+
+__all__ = ['PyOrbEphemerides']
+
+
 def dtime(time_prev):
     return (time.time() - time_prev, time.time())
 
-__all__ = ['PyOrbEphemerides']
 
 class PyOrbEphemerides(object):
     """Generate ephemerides and propagate orbits using the python interface to Oorb.
