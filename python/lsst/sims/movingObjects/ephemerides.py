@@ -266,8 +266,8 @@ class PyOrbEphemerides(object):
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
         dt, t = dtime(t)
         if verbose:
-            print "# Calculating ephemerides for %d objects over %d times required %f seconds"\
-                  % (len(self.orbitObj), len(times), dt)
+            print("# Calculating ephemerides for %d objects over %d times required %f seconds"
+                  % (len(self.orbitObj), len(times), dt))
         return ephs
 
     def propagateOrbits(self, newEpoch):

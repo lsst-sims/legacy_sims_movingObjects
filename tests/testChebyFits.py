@@ -61,7 +61,7 @@ class TestChebyFits(unittest.TestCase):
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
                 self.assertEqual((cheb.length * 100) % 1, 0)
-                # print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
+                # print('final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio)
         # And check for challenging 'impactors'.
         for orbitFile in (['test_orbitsImpactors.s3m']):
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
@@ -73,7 +73,7 @@ class TestChebyFits(unittest.TestCase):
                 cheb.calcSegmentLength()
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
-                # print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
+                # print('final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio)
 
     def testSegments(self):
         # Test that we can create segments.

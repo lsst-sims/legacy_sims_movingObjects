@@ -92,11 +92,11 @@ class TestChebyValues(unittest.TestCase):
         # Let's just look at the max residuals in all quantities.
         for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
             resids = np.abs(ephemerides[k] - pyephemerides[k][0])
-            print 'max diff', k, np.max(resids)
+            print('max diff', k, np.max(resids))
         resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'][0])
-        print 'max diff elongation', np.max(resids)
+        print('max diff elongation', np.max(resids))
         resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
-        print 'max diff vmag', np.max(resids)
+        print('max diff vmag', np.max(resids))
         # Test this for a subset of the objects.
         objIds = self.orbits.orbits.objId.head(3).as_matrix()
         ephemerides = chebyValues.getEphemerides(time, objIds)
@@ -162,16 +162,16 @@ class TestJPLValues(unittest.TestCase):
             deltaRA[i] = dRA.max()
             deltaDec[i] = dDec.max()
             if deltaRA[i] > 18:
-                print j['objId'], ephs['objId']
-                print j['ra_deg']
-                print ephs['ra']
-                print j['dec_deg']
-                print ephs['dec']
+                print(j['objId'], ephs['objId'])
+                print(j['ra_deg'])
+                print(ephs['ra'])
+                print(j['dec_deg'])
+                print(ephs['dec'])
         # Should be (given OOrb direct prediction):
         # Much of the time we're closer than 1mas, but there are a few which hit higher values.
         # This is consistent with the errors/values reported by oorb directly in testEphemerides.
-        print 'max JPL errors', deltaRA.max(), deltaDec.max()
-        print 'std of JPL errors', np.std(deltaRA), np.std(deltaDec)
+        print('max JPL errors', deltaRA.max(), deltaDec.max())
+        print('std of JPL errors', np.std(deltaRA), np.std(deltaDec))
         self.assertTrue(np.max(deltaRA) < 18)
         self.assertTrue(np.max(deltaDec) < 6)
         self.assertTrue(np.std(deltaRA) < 2)

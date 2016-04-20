@@ -35,11 +35,11 @@ if __name__ == '__main__':
 
     # Parse orbit file input values.
     if args.orbitFile is None:
-        print "Must specify orbit file to use."
+        print("Must specify orbit file to use.")
         exit()
 
     if not os.path.isfile(args.orbitFile):
-        print "Could not find orbit file %s" % (args.orbitFile)
+        print("Could not find orbit file %s" % (args.orbitFile))
     if args.orbitFile.lower().endswith('s3m'):
         skiprows = 1
     else:
@@ -52,13 +52,13 @@ if __name__ == '__main__':
     # Parse start, end and timespan values.
     if args.tStart is None:
         tStart = orbits.orbits.epoch.iloc[0]
-        print "tStart was not specified: using the first epoch in the orbits file: %f" % (tStart)
+        print("tStart was not specified: using the first epoch in the orbits file: %f" % (tStart))
     else:
         tStart = args.tStart
 
     if (args.tEnd is not None) and (args.tSpan is not None):
         if args.tEnd != args.tStart + args.tSpan:
-            print "Provided incompatible values of tEnd and tSpan - please specify one or the other."
+            print("Provided incompatible values of tEnd and tSpan - please specify one or the other.")
             exit()
 
     if args.tEnd is not None:
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     else:
         if args.tSpan is None:
             tSpan = 30
-            print "Neither tEnd nor tSpan was specified: using 30 days."
+            print("Neither tEnd nor tSpan was specified: using 30 days.")
         else:
             tSpan = args.tSpan
         tEnd = tStart + tSpan
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         subsetOrbits = Orbits()
         subsetOrbits.setOrbits(subset)
         # Fit chebyshev polynomials.
-        print "Working on objects %d to %d" % (n, n + nObj)
+        print("Working on objects %d to %d" % (n, n + nObj))
         cheb = ChebyFits(subsetOrbits, tStart, tSpan, skyTolerance=args.skyTol,
                          nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
                          ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,

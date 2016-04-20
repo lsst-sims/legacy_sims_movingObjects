@@ -155,8 +155,8 @@ class TestJPLValues(unittest.TestCase):
         self.assertTrue(np.max(deltaDec) < 6)
         self.assertTrue(np.std(deltaRA) < 2)
         self.assertTrue(np.std(deltaDec) < 1)
-        print 'max JPL errors', np.max(deltaRA), np.max(deltaDec)
-        print 'std JPL errors', np.std(deltaRA), np.std(deltaDec)
+        print('max JPL errors', np.max(deltaRA), np.max(deltaDec))
+        print('std JPL errors', np.std(deltaRA), np.std(deltaDec))
 
 
 if __name__ == '__main__':

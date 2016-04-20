@@ -50,7 +50,6 @@ class TestChebgrid(unittest.TestCase):
         y = np.sin(x)
         dy = np.cos(x)
         p, resid, rms, maxresid = chebyUtils.chebfit(x, y, dy, nPoly=16)
-        print p
         yy, vv = chebyUtils.chebeval(x, p, interval=np.array([0, np.pi]))
         self.assertTrue(np.allclose(yy, y, rtol=1e-13))
         self.assertTrue(np.allclose(vv, dy, rtol=1e-13))

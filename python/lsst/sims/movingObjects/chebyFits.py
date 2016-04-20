@@ -85,7 +85,7 @@ class ChebyFits(object):
         self.tStart = round(tStart, self.nDecimal)
         self.tSpan = round(tSpan, self.nDecimal)
         self.tEnd = self.tStart + self.tSpan
-        # print 'input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix()
+        # print('input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix())
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
         elif timeScale.upper() == 'UTC':
@@ -273,7 +273,7 @@ class ChebyFits(object):
             length = self._roundLength(length)
             pos_resid, ratio = self._testResiduals(length)
             counter += 1
-            # print counter, length, pos_resid, ratio
+            # print(counter, length, pos_resid, ratio)
         if counter > maxIterations or length <= 0:
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
@@ -382,10 +382,10 @@ class ChebyFits(object):
         tSegmentEnd = ephs['time'][-1]
         coeff_ra, coeff_dec, max_pos_resid = self._getCoeffsPosition(ephs)
         if max_pos_resid > self.skyTolerance:
-            # print 'subdividing segments', orbitObj.orbits.objId.iloc[0]
+            # print('subdividing segments', orbitObj.orbits.objId.iloc[0])
             self._subdivideSegment(orbitObj, ephs)
         else:
-            # print 'working on ', orbitObj.orbits.objId.iloc[0], 'at times', tSegmentStart, tSegmentEnd
+            # print('working on ', orbitObj.orbits.objId.iloc[0], 'at times', tSegmentStart, tSegmentEnd)
             coeffs, max_resids = self._getCoeffsOther(ephs)
             fitFailed = False
             for k in max_resids:
@@ -480,18 +480,18 @@ class ChebyFits(object):
         timeformat = '%.' + '%s' % self.nDecimal + 'f'
         with open(coeffFile, openMode) as f:
             if header is not None:
-                print >>f, header
+                print(header, file=f)
             for i, (objId, tStart, tEnd, cRa, cDec, cDelta, cVmag, cE) in \
                     enumerate(zip(self.coeffs['objId'], self.coeffs['tStart'],
                                   self.coeffs['tEnd'], self.coeffs['ra'],
                                   self.coeffs['dec'], self.coeffs['delta'],
                                   self.coeffs['vmag'], self.coeffs['elongation'])):
-                print >>f, "%s %s %s %s %s %s %s %s" % (objId, timeformat % tStart, timeformat % tEnd,
-                                                        " ".join('%.14e' % j for j in cRa),
-                                                        " ".join('%.14e' % j for j in cDec),
-                                                        " ".join('%.7e' % j for j in cDelta),
-                                                        " ".join('%.7e' % j for j in cVmag),
-                                                        " ".join('%.7e' % j for j in cE))
+                print("%s %s %s %s %s %s %s %s" % (objId, timeformat % tStart, timeformat % tEnd,
+                                                   " ".join('%.14e' % j for j in cRa),
+                                                   " ".join('%.14e' % j for j in cDec),
+                                                   " ".join('%.7e' % j for j in cDelta),
+                                                   " ".join('%.7e' % j for j in cVmag),
+                                                   " ".join('%.7e' % j for j in cE)), file=f)
 
         with open(residFile, openMode) as f:
             for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in \
@@ -499,13 +499,13 @@ class ChebyFits(object):
                                   self.resids['tEnd'], self.resids['pos'],
                                   self.resids['delta'], self.resids['vmag'],
                                   self.resids['elongation'])):
-                print >> f, "%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e" % (objId, i + 1,
-                                                                                 tStart, tEnd,
-                                                                                 (tEnd - tStart),
-                                                                                 rPos, rDelta,
-                                                                                 rVmag, rE)
+                print("%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e" % (objId, i + 1,
+                                                                           tStart, tEnd,
+                                                                           (tEnd - tStart),
+                                                                           rPos, rDelta,
+                                                                           rVmag, rE), file=f)
 
         if len(self.failed) > 0:
             with open(failedFile, openMode) as f:
                 for i, failed in enumerate(self.failed):
-                    print >>f, ' '.join([str(x) for x in failed])
+                    print(' '.join([str(x) for x in failed]), file=f)
