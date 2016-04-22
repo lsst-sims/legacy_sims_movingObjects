@@ -98,6 +98,15 @@ class Orbits(object):
             warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
                           "Using %s" % (format, self.format, self.format))
 
+        # Check that the orbit epoch is within a 'reasonable' range, to detect possible column mismatches.
+        general_epoch = orbits['epoch'].iloc[0]
+        expect_min_epoch = 16000.
+        expect_max_epoch = 80000.
+        if general_epoch < expect_min_epoch or general_epoch > expect_max_epoch:
+            raise ValueError("The epoch detected for this orbit is odd - %f. " % (general_epoch)
+                             "Expecting a value between %.1f and %.1f" % (expect_min_epoch,
+                                                                          expect_max_epoch))
+
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
             orbits['objId'] = np.arange(0, nSso, 1)
@@ -126,7 +135,7 @@ class Orbits(object):
         """Read orbits from a file, generating a pandas dataframe containing columns matching
         dataCols, for the appropriate orbital parameter format (currently accepts COM or KEP formats).
 
-        After reading and standardizing the column names, calls self.setOrbits to validate the
+        After reading and standardizing the column names, calls selfs.setOrbits to validate the
         orbital parameters. Expects angles in orbital element formats to be in degrees.
 
         Parameters
