@@ -82,6 +82,11 @@ class Orbits(object):
 
         nSso = len(orbits)
 
+        # Error if orbits is empty (this avoids hard-to-interpret error messages from pyoorb).
+        if nSso == 0:
+            raise ValueError('Length of the orbits dataframe was 0.')
+            return
+
         # Discover which type of orbital parameters we have on disk.
         format = None
         if 'FORMAT' in orbits:
@@ -99,7 +104,7 @@ class Orbits(object):
                           "Using %s" % (format, self.format, self.format))
 
         # Check that the orbit epoch is within a 'reasonable' range, to detect possible column mismatches.
-        general_epoch = orbits['epoch'].iloc[0]
+        general_epoch = orbits['epoch'].head(1).values[0]
         expect_min_epoch = 16000.
         expect_max_epoch = 80000.
         if general_epoch < expect_min_epoch or general_epoch > expect_max_epoch:
