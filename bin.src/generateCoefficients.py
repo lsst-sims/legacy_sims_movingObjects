@@ -52,7 +52,7 @@ if __name__ == '__main__':
         skiprows = 0
 
     # Check that basic information about tSpan or tEnd is available.
-    if args.tEnd is None and args.tEnd is None:
+    if args.tEnd is None and args.tSpan is None:
         print("Must specify at least one of tSpan or tEnd")
         exit()
 
