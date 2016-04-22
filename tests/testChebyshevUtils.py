@@ -3,7 +3,7 @@ import numpy as np
 import lsst.sims.movingObjects.chebyshevUtils as chebyUtils
 import pickle
 import unittest
-import lsst.utils.getPackageDir as getPackageDir
+from lsst.utils import getPackageDir
 
 
 class TestChebgrid(unittest.TestCase):

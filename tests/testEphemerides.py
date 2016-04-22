@@ -1,3 +1,4 @@
+from __future__ import print_function
 import unittest
 import os
 import numpy as np
@@ -6,7 +7,7 @@ from astropy.time import Time
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
-import lsst.utils.getPackageDir as getPackageDir
+from lsst.utils import getPackageDir
 
 
 class TestPyOrbEphemerides(unittest.TestCase):

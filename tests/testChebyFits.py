@@ -1,10 +1,11 @@
+from __future__ import print_function
 import unittest
 import os
 import warnings
 import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
-import lsst.utils.getPackageDir as getPackageDir
+from lsst.utils import getPackageDir
 
 
 class TestChebyFits(unittest.TestCase):

@@ -1,9 +1,10 @@
+from __future__ import print_function
 import unittest
 import os
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
-import lsst.utils.getPackageDir as getPackageDir
+from lsst.utils import getPackageDir
 
 
 class TestOrbits(unittest.TestCase):
