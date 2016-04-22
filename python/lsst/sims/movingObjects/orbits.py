@@ -103,9 +103,10 @@ class Orbits(object):
         expect_min_epoch = 16000.
         expect_max_epoch = 80000.
         if general_epoch < expect_min_epoch or general_epoch > expect_max_epoch:
-            raise ValueError("The epoch detected for this orbit is odd - %f. " % (general_epoch)
-                             "Expecting a value between %.1f and %.1f" % (expect_min_epoch,
-                                                                          expect_max_epoch))
+            raise ValueError("The epoch detected for this orbit is odd - %f. " \
+                                 "Expecting a value between %.1f and %.1f" % (general_epoch,
+                                                                              expect_min_epoch,
+                                                                              expect_max_epoch))
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
