@@ -97,7 +97,8 @@ class Orbits(object):
         elif 'a' in orbits:
             self.format = 'KEP'
         else:
-            raise ValueError('Cannot determine orbital type - neither q nor a in input orbital elements')
+            raise ValueError('Cannot determine orbital type, as neither q nor a in input orbital elements.\n'
+                             'Was attempting to base orbital element quantities on header row, with columns: \n%s' % orbits.columns)
         # Report a warning if formats don't seem to match.
         if (format is not None) and (format != self.format):
             warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
@@ -108,10 +109,10 @@ class Orbits(object):
         expect_min_epoch = 16000.
         expect_max_epoch = 80000.
         if general_epoch < expect_min_epoch or general_epoch > expect_max_epoch:
-            raise ValueError("The epoch detected for this orbit is odd - %f. " \
-                                 "Expecting a value between %.1f and %.1f" % (general_epoch,
-                                                                              expect_min_epoch,
-                                                                              expect_max_epoch))
+            raise ValueError("The epoch detected for this orbit is odd - %f. "
+                             "Expecting a value between %.1f and %.1f" % (general_epoch,
+                                                                          expect_min_epoch,
+                                                                          expect_max_epoch))
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
