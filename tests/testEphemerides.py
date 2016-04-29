@@ -15,13 +15,13 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
-        self.orbitsA = Orbits()
-        self.orbitsA.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
+        self.orbitsKEP = Orbits()
+        self.orbitsKEP.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.ephems = PyOrbEphemerides()
 
     def tearDown(self):
         del self.orbits
-        del self.orbitsA
+        del self.orbitsKEP
         del self.ephems
 
     def testSetOrbits(self):
@@ -48,11 +48,11 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.assertEqual(self.ephems.oorbElem[0][9], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbits.orbits['q'][0])
         # Test that we can convert KEP orbital elements too.
-        self.ephems.orbitObj = self.orbitsA
+        self.ephems.orbitObj = self.orbitsKEP
         self.ephems._convertToOorbElem()
-        self.assertEqual(len(self.ephems.oorbElem), len(self.orbitsA))
+        self.assertEqual(len(self.ephems.oorbElem), len(self.orbitsKEP))
         self.assertEqual(self.ephems.oorbElem[0][7], 3)
-        self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsA.orbits['a'][0])
+        self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsKEP.orbits['a'][0])
 
     def testConvertFromOorbArray(self):
         self.ephems.orbitObj = self.orbits
@@ -95,22 +95,23 @@ class TestPyOrbEphemerides(unittest.TestCase):
         ephsAll = self.ephems.generateEphemerides(times, obscode=807,
                                                   timeScale='UTC', byObject=False)
         np.testing.assert_equal(ephsAll, ephs)
-        # And calculate ephemerides using KEP elements.
-        self.ephems.setOrbits(self.orbitsA)
+        # Reset ephems to use KEP Orbits, and calculate new ephemerides.
+        self.ephems.setOrbits(self.orbitsKEP)
         oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
-        ephsA = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
-        self.assertEqual(len(ephsA), len(self.orbitsA))
-        ephsA = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
-        self.assertEqual(len(ephsA), len(times))
+        ephsKEP = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
+        self.assertEqual(len(ephsKEP), len(self.orbitsKEP))
+        ephsKEP = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
+        self.assertEqual(len(ephsKEP), len(times))
         # Check that ephemerides calculated by each method are almost equal.
         for column in ephs.dtype.names:
-            np.testing.assert_almost_equal(ephs[column], ephsA[column])
+            np.testing.assert_allclose(ephs[column], ephsKEP[column], rtol=0, atol=1e-7)
         # And test all-wrapped-up method:
-        ephsAllA = self.ephems.generateEphemerides(times, obscode=807,
-                                                   timeScale='UTC', byObject=False)
-        np.testing.assert_equal(ephsAllA, ephsA)
+        ephsAllKEP = self.ephems.generateEphemerides(times, obscode=807,
+                                                     timeScale='UTC', byObject=False)
+        np.testing.assert_equal(ephsAllKEP, ephsKEP)
+        # Check that the wrapped method using KEP elements and the wrapped method using COM elements match.
         for column in ephsAll.dtype.names:
-            np.testing.assert_almost_equal(ephsAllA[column], ephsAll[column])
+            np.testing.assert_allclose(ephsAllKEP[column], ephsAll[column], rtol=0, atol=1e-7)
 
 
 class TestJPLValues(unittest.TestCase):

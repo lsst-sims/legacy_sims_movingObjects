@@ -224,7 +224,7 @@ def makeChebMatrixOnlyX(nPoints, nPoly):
 
     c1c2 = c1c2.reshape(nPoly + 2, nPoints)
     c1c2 = c1c2[:, ::-1]
-    return c1c2[0:nPoly], None
+    return c1c2[0:nPoly]
 
 
 def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
@@ -271,7 +271,9 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
     numpy.ndarray
         Array of residuals of the tabulated function x minus the approximated function.
     float
-        The rms residuals in the fit.
+        The rms of the residuals in the fit.
+    float
+        The maximum of the residals to the fit.
     """
     nPoints = len(t)
     if len(x) != nPoints:

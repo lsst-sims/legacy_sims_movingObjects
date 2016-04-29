@@ -32,9 +32,13 @@ if __name__ == '__main__':
     parser.add_argument("--skyTol", type=float, default=2.5,
                         help="Sky tolerance for position residuals; default 2.5 mas")
     parser.add_argument("--length", type=float, default=None,
-                        help="Chebyshev polynomial length (will self-determine if not given).")
-    parser.add_argument("--nDecimal", type=int, default=10,
-                        help="Number of decimal places to use for timespan. Default 10.")
+                        help="Segment length (in days) for each polynomial fit: "
+                        "time span of a single row in coefficients file. "
+                        "(Will self-determine from skyTol and nCoeff if not given).")
+    parser.add_argument("--nDecimal", type=int, default=5,
+                        help="Number of decimal places to use for timespan. Default 5."
+                        "For LSST databases, this should be set to 0 for objects other than NEOs,"
+                        " and to 14 for NEOs.")
     parser.add_argument("--nCoeff", type=int, default=14,
                         help="Number of coefficients to use for the position polynomials. Default 14.")
     args = parser.parse_args()

@@ -72,8 +72,7 @@ class TestChebyValues(unittest.TestCase):
                 # All of these will only be accurate to 2 less decimal places than they are
                 # print out with in chebyFits. Since vmag, delta and elongation only use 7
                 # decimal places, this means we can test to 5 decimal places for those.
-                np.testing.assert_almost_equal(chebyValues.coeffs[k], chebyValues2.coeffs[k],
-                                               decimal=5)
+                np.testing.assert_allclose(chebyValues.coeffs[k], chebyValues2.coeffs[k], rtol=0, atol=1e-5)
 
     def testGetEphemerides(self):
         # Test that getEphemerides works and is accurate.

@@ -79,7 +79,7 @@ class TestChebyFits(unittest.TestCase):
     def testSegments(self):
         # Test that we can create segments.
         self.cheb.calcSegmentLength(length=1.0)
-        times = self.cheb.getAllTimes()
+        times = self.cheb.makeAllTimes()
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
         # We expect calculated coefficients to have the following keys:
@@ -96,7 +96,7 @@ class TestChebyFits(unittest.TestCase):
     def testWrite(self):
         # Test that we can write the output to files.
         self.cheb.calcSegmentLength()
-        self.cheb.generateEphemerides(self.cheb.getAllTimes())
+        self.cheb.generateEphemerides(self.cheb.makeAllTimes())
         self.cheb.calcSegments()
         self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
         self.assertTrue(os.path.isfile('tmpCoeff'))

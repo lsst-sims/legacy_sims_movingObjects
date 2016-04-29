@@ -10,6 +10,7 @@ doc/htmlDir
 tests/.tests
 ups/*.cfgc
 doc/build
+bin/*
 python/lsst/sims/movingObjects/version.py
 *.pdf
 *.png

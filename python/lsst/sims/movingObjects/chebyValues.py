@@ -28,9 +28,10 @@ class ChebyValues(object):
         # Convert list of coefficients into numpy arrays.
         for k in self.coeffs:
             self.coeffs[k] = np.array(self.coeffs[k])
-        # Check that expected values
-        if len(set(self.coeffKeys) - set(self.coeffs)) > 0:
-            raise ValueError('Did not receive all expected coefficient keys from chebyFitsCoefficients')
+        # Check that expected values were received.
+        missing_keys = set(self.coeffKeys) - set(self.coeffs)
+        if len(missing_keys) > 0:
+            raise ValueError("Expected to find key(s) %s in coefficients." %  ' '.join(list[missing_keys]))
         self.coeffs['meanRA'] = self.coeffs['ra'].swapaxes(0, 1)[0]
         self.coeffs['meanDec'] = self.coeffs['dec'].swapaxes(0, 1)[0]
 
