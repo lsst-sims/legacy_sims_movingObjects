@@ -1,12 +1,15 @@
+from __future__ import print_function
 import unittest
 import os
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
+from lsst.utils import getPackageDir
+
 
 class TestOrbits(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'orbits_testdata'
+        self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
 
     def testEqualNotEqual(self):
         orbits = Orbits()

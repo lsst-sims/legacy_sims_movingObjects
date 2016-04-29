@@ -224,7 +224,7 @@ def makeChebMatrixOnlyX(nPoints, nPoly):
 
     c1c2 = c1c2.reshape(nPoly + 2, nPoints)
     c1c2 = c1c2[:, ::-1]
-    return c1c2[0:nPoly], None
+    return c1c2[0:nPoly]
 
 
 def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
@@ -260,8 +260,8 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
         Optional 2D Matrix with rows of C1^(-1)C2 corresponding to dx/dt.
         Use makeChebMatrix to compute
     nPoly : int, optional
-        Number of polynomial terms. Degree + 1.  Must be >=2 and < 2*(npoints + 1),
-        when derivative information is specified or less than npoints + 1, when no
+        Number of polynomial terms. Degree + 1.  Must be >=2 and <=2*nPoints,
+        when derivative information is specified, or <=nPoints, when no
         derivative information is specified. Default = 7.
 
     Returns
@@ -271,19 +271,21 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
     numpy.ndarray
         Array of residuals of the tabulated function x minus the approximated function.
     float
-        The rms residuals in the fit.
+        The rms of the residuals in the fit.
+    float
+        The maximum of the residals to the fit.
     """
     nPoints = len(t)
     if len(x) != nPoints:
         raise ValueError("length of x (%s) != length of t (%s)" % (len(x), nPoints))
     if dxdt is None:
-        if nPoly >= nPoints:
-            raise RuntimeError('Without velocity constraints, nPoly (%d) must be less than %s' % (nPoly, nPoints + 1))
+        if nPoly > nPoints:
+            raise RuntimeError('Without velocity constraints, nPoly (%d) must be less than %s' % (nPoly, nPoints))
         if nPoly < 2:
             raise RuntimeError('Without velocity constraints, nPoly (%d) must be greater than 2' % nPoly)
     else:
-        if nPoly >= 2 * (nPoints + 1):
-            raise RuntimeError('nPoly (%d) must be less than %s (%d)' % (nPoly, '2 * (nPoints + 1)', 2 * (nPoints + 1)))
+        if nPoly > 2 * nPoints:
+            raise RuntimeError('nPoly (%d) must be less than %s (%d)' % (nPoly, '2 * nPoints', 2 * (nPoints)))
         if nPoly < 4:
             raise RuntimeError('nPoly (%d) must be greater than 4' % nPoly)
 

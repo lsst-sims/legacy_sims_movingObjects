@@ -1,13 +1,16 @@
+from __future__ import print_function
 import unittest
 import os
 import warnings
 import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
+from lsst.utils import getPackageDir
+
 
 class TestChebyFits(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'orbits_testdata'
+        self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.cheb = ChebyFits(self.orbits, 54800, 30, ngran=64, skyTolerance=2.5,
@@ -59,7 +62,7 @@ class TestChebyFits(unittest.TestCase):
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
                 self.assertEqual((cheb.length * 100) % 1, 0)
-                #print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
+                # print('final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio)
         # And check for challenging 'impactors'.
         for orbitFile in (['test_orbitsImpactors.s3m']):
             self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
@@ -71,12 +74,12 @@ class TestChebyFits(unittest.TestCase):
                 cheb.calcSegmentLength()
                 pos_resid, ratio = cheb._testResiduals(cheb.length)
                 self.assertTrue(pos_resid < skyTolerance)
-                #print 'final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio
+                # print('final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio)
 
     def testSegments(self):
         # Test that we can create segments.
         self.cheb.calcSegmentLength(length=1.0)
-        times = self.cheb.getAllTimes()
+        times = self.cheb.makeAllTimes()
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
         # We expect calculated coefficients to have the following keys:
@@ -93,15 +96,16 @@ class TestChebyFits(unittest.TestCase):
     def testWrite(self):
         # Test that we can write the output to files.
         self.cheb.calcSegmentLength()
-        self.cheb.generateEphemerides(self.cheb.getAllTimes())
+        self.cheb.generateEphemerides(self.cheb.makeAllTimes())
         self.cheb.calcSegments()
         self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
         self.assertTrue(os.path.isfile('tmpCoeff'))
         self.assertTrue(os.path.isfile('tmpResids'))
 
+
 class TestRun(unittest.TestCase):
     def setUp(self):
-        self.testdir = 'orbits_testdata'
+        self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
         self.coeffFile = 'tmpCoeff'

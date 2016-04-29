@@ -1,0 +1,6 @@
+# -*- python -*-
+import os
+from lsst.sconsUtils import scripts, env
+
+env.AppendENVPath('OORB_DATA', os.environ['OORB_DATA'])
+scripts.BasicSConscript.tests()

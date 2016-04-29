@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 from itertools import repeat
 import warnings
@@ -7,10 +8,13 @@ import pyoorb as oo
 from .orbits import Orbits
 
 import time
+
+__all__ = ['PyOrbEphemerides']
+
+
 def dtime(time_prev):
     return (time.time() - time_prev, time.time())
 
-__all__ = ['PyOrbEphemerides']
 
 class PyOrbEphemerides(object):
     """Generate ephemerides and propagate orbits using the python interface to Oorb.
@@ -263,8 +267,8 @@ class PyOrbEphemerides(object):
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
         dt, t = dtime(t)
         if verbose:
-            print "# Calculating ephemerides for %d objects over %d times required %f seconds"\
-                  % (len(self.orbitObj), len(times), dt)
+            print("# Calculating ephemerides for %d objects over %d times required %f seconds"
+                  % (len(self.orbitObj), len(times), dt))
         return ephs
 
     def propagateOrbits(self, newEpoch):
