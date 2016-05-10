@@ -63,7 +63,7 @@ class TestOrbits(unittest.TestCase):
         self.assertEqual(len(orbit_slice), 3)
 
 
-    def testOffsetDatafram(self):
+    def testOffsetDataframe(self):
         """
         Test that we can slice and iterate through an orbits
         dataframe that has already been sub-selected from another
