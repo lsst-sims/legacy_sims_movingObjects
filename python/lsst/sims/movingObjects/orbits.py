@@ -26,8 +26,7 @@ class Orbits(object):
 
     def __getitem__(self, i):
         orb = Orbits()
-        idx = i + self.orbits.index[0]
-        orb.setOrbits(self.orbits.query('index==@idx'))
+        orb.setOrbits(self.orbits.iloc[i])
         return orb
 
     def __iter__(self):

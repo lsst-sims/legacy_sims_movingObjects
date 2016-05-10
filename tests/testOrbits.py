@@ -42,6 +42,57 @@ class TestOrbits(unittest.TestCase):
             self.assertTrue(isinstance(orb, Orbits))
             self.assertEqual(orb.orbits.index, i)
 
+
+    def testSlicing(self):
+        """
+        Test that we can slice a collection of orbits
+        """
+        orbits = Orbits()
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
+        orbit_slice = orbits[2:6]
+        self.assertEqual(orbit_slice[0], orbits[2])
+        self.assertEqual(orbit_slice[1], orbits[3])
+        self.assertEqual(orbit_slice[2], orbits[4])
+        self.assertEqual(orbit_slice[3], orbits[5])
+        self.assertEqual(len(orbit_slice), 4)
+
+        orbit_slice = orbits[1:7:2]
+        self.assertEqual(orbit_slice[0], orbits[1])
+        self.assertEqual(orbit_slice[1], orbits[3])
+        self.assertEqual(orbit_slice[2], orbits[5])
+        self.assertEqual(len(orbit_slice), 3)
+
+
+    def testOffsetDataframe(self):
+        """
+        Test that we can slice and iterate through an orbits
+        dataframe that has already been sub-selected from another
+        datafram
+        """
+        orbits0 = Orbits()
+        orbits0.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
+
+        orbitsSub = Orbits()
+        orbitsSub.setOrbits(orbits0.orbits.query('index>1'))
+
+        self.assertEqual(len(orbitsSub), 6)
+
+        orbit_slice = orbitsSub[2:6]
+        self.assertEqual(orbit_slice[0], orbitsSub[2])
+        self.assertEqual(orbit_slice[1], orbitsSub[3])
+        self.assertEqual(orbit_slice[2], orbitsSub[4])
+        self.assertEqual(orbit_slice[3], orbitsSub[5])
+        self.assertEqual(len(orbit_slice), 4)
+
+        orbit_slice = orbitsSub[1:5:2]
+        self.assertEqual(orbit_slice[0], orbitsSub[1])
+        self.assertEqual(orbit_slice[1], orbitsSub[3])
+        self.assertEqual(len(orbit_slice), 2)
+
+        for ii, oo in enumerate(orbitsSub):
+            self.assertEqual(oo, orbits0[ii+2])
+
+
     def testReadOrbits(self):
         orbits = Orbits()
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
