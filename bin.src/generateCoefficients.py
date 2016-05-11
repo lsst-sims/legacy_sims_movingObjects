@@ -93,7 +93,7 @@ if __name__ == '__main__':
     elif args.tSpan is not None and args.tEnd is None:
         tSpan = args.tSpan
         tEnd = tStart + tSpan
-    elif args.tEnd is None and args.tEnd is not None:
+    elif args.tSpan is None and args.tEnd is not None:
         tEnd = args.tEnd
         tSpan = tEnd - tStart
 
