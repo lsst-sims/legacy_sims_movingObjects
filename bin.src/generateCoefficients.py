@@ -36,7 +36,7 @@ if __name__ == '__main__':
                         "time span of a single row in coefficients file. "
                         "(Will self-determine from skyTol and nCoeff if not given).")
     parser.add_argument("--nDecimal", type=int, default=5,
-                        help="Number of decimal places to use for timespan. Default 5."
+                        help="Number of decimal places to use for timespan. Default 5. "
                         "For LSST databases, this should be set to 0 for objects other than NEOs,"
                         " and to 14 for NEOs.")
     parser.add_argument("--nCoeff", type=int, default=14,
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         if args.objEnd is None:
             args.objEnd = len(orbits) - 1
         orbits = orbits[args.objStart:args.objEnd + 1]
-        fileSuffix = '_obj%d_%d' % (args.objStart, args.objEnd)
+        fileSuffix = 'obj%d_%d' % (args.objStart, args.objEnd)
     else:
         fileSuffix = ''
 
@@ -87,25 +87,33 @@ if __name__ == '__main__':
     else:
         tStart = args.tStart
 
+    # We have already ruled out the case where args.tSpan and args.tEnd are None, above.
     if args.tSpan is not None and args.tEnd is not None:
-        tSpan = args.tSpan
         tEnd = args.tEnd
-    elif args.tSpan is not None and args.tEnd is None:
         tSpan = args.tSpan
-        tEnd = tStart + tSpan
-    elif args.tSpan is None and args.tEnd is not None:
+    elif args.tSpan is None:
+        # Then args.tEnd must be defined.
         tEnd = args.tEnd
         tSpan = tEnd - tStart
+    elif args.tEnd is None:
+        # Then args.tSpan must be defined.
+        tSpan = args.tSpan
+        tEnd = tStart + tSpan
+    else:
+        # Put this here to make code checker happy (and to guard against deletion of earlier check).
+        raise ValueError("Must specify at least one of tSpan or tEnd")
+
+    fileRoot = '.'.join(args.orbitFile.split('.')[:-1])
+    logFile = '__'.join([fileRoot, 'log', fileSuffix]).rstrip('_')
+    log = open(logFile, 'w')
 
     timespans = np.arange(tStart, tEnd, tSpan)
     for t in timespans:
         # Set output file names.
-        coeffFile = '.'.join(args.orbitFile.split('.')[:-1]) + \
-            '_coeffs_%.2f_%.2f' % (t, t + tSpan) + fileSuffix
-        residFile = '.'.join(args.orbitFile.split('.')[:-1]) + \
-            '_resids_%.2f_%.2f' % (t, t + tSpan) + fileSuffix
-        failedFile = '.'.join(args.orbitFile.split('.')[:-1]) + \
-            '_failed_%.2f_%.2f' % (t, t + tSpan) + fileSuffix
+        timestring = '%.2f_%.2f' % (t, t + tSpan)
+        coeffFile = '__'.join([fileRoot, 'coeffs', timestring, fileSuffix]).rstrip('_')
+        residFile = '__'.join([fileRoot, 'resids', timestring, fileSuffix]).rstrip('_')
+        failedFile = '__'.join([fileRoot, 'failed', timestring, fileSuffix]).rstrip('_')
 
         # Cycle through nObj at a time, to fit and write data files.
         append = False
@@ -114,7 +122,7 @@ if __name__ == '__main__':
             subsetOrbits = Orbits()
             subsetOrbits.setOrbits(subset)
             # Fit chebyshev polynomials.
-            print("Working on objects %d to %d in timespan %f to %f" % (n, n + nObj, t, t + tSpan))
+            print("Working on objects %d to %d in timespan %f to %f" % (n, n + nObj, t, t + tSpan), file=log)
             cheb = ChebyFits(subsetOrbits, t, tSpan, skyTolerance=args.skyTol,
                              nDecimal=args.nDecimal, nCoeff_position=args.nCoeff,
                              ngran=64, nCoeff_vmag=9, nCoeff_delta=5, nCoeff_elongation=6,
@@ -126,9 +134,11 @@ if __name__ == '__main__':
                 cheb.length = None
                 for objId in subsetOrbits.orbits['objId'].as_matrix():
                     cheb.failed.append((objId, tStart, tEnd))
-                    warnings.warn('Objid %s to %s (n %d to %d), segment %f to %f - error: %s'
-                                  % (subsetOrbits.orbits.objId.iloc[0], subsetOrbits.orbits.objId.iloc[-1],
-                                     n, n + nObj, t, t + tSpan, ve.message))
+                    warnings.showwarning("Objid %s to %s (n %d to %d), segment %f to %f - error: %s"
+                                         % (subsetOrbits.orbits.objId.iloc[0],
+                                            subsetOrbits.orbits.objId.iloc[-1],
+                                            n, n + nObj, t, t + tSpan, ve.message),
+                                         UserWarning, log)
 
             # Put this in a separate try/except block, because errors here can mask errors in the previous
             # length determination stage otherwise.
@@ -138,11 +148,14 @@ if __name__ == '__main__':
                 except ValueError as ve:
                     for objId in subsetOrbits.orbits['objId'].as_matrix():
                         cheb.failed.append((objId, tStart, tEnd))
-                        warnings.warn('Objid %s to %s (n %d to %d), segment %f to %f - error: %s'
-                                      % (subsetOrbits.orbits.objId.iloc[0],
-                                         subsetOrbits.orbits.objId.iloc[-1],
-                                         n, n + nObj, t, t + tSpan, ve.message))
+                        warnings.showwarning("Objid %s to %s (n %d to %d), segment %f to %f - error: %s"
+                                             % (subsetOrbits.orbits.objId.iloc[0],
+                                                subsetOrbits.orbits.objId.iloc[-1],
+                                                n, n + nObj, t, t + tSpan, ve.message),
+                                             UserWarning, log)
 
             # Write out coefficients.
             cheb.write(coeffFile, residFile, failedFile, append=append)
             append = True
+    print("ALL DONE", file=log)
+
