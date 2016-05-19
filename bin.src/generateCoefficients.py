@@ -138,7 +138,7 @@ if __name__ == '__main__':
                                          % (subsetOrbits.orbits.objId.iloc[0],
                                             subsetOrbits.orbits.objId.iloc[-1],
                                             n, n + nObj, t, t + tSpan, ve.message),
-                                         UserWarning, log)
+                                         UserWarning, "generateCoefficients.py", 132, file=log)
 
             # Put this in a separate try/except block, because errors here can mask errors in the previous
             # length determination stage otherwise.
@@ -152,7 +152,7 @@ if __name__ == '__main__':
                                              % (subsetOrbits.orbits.objId.iloc[0],
                                                 subsetOrbits.orbits.objId.iloc[-1],
                                                 n, n + nObj, t, t + tSpan, ve.message),
-                                             UserWarning, log)
+                                             UserWarning, "generateCoefficients.py", 147, file=log)
 
             # Write out coefficients.
             cheb.write(coeffFile, residFile, failedFile, append=append)
