@@ -460,7 +460,7 @@ class ChebyFits(object):
             newCheby.calcSegmentLength()
         except ValueError as ve:
             # Could not find a good segment length.
-            warnings.warn('Objid %s, segment %f to %f - error:'
+            warnings.warn('Objid %s, segment %f to %f - error: %s'
                           % (orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1], ve.message))
             self.failed += newCheby.failed
             return
