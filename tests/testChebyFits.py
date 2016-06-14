@@ -8,6 +8,14 @@ from lsst.sims.movingObjects import ChebyFits
 from lsst.utils import getPackageDir
 
 
+try:
+    import numexpr
+    _has_numexpr = True
+except ImportError:
+    _has_numexpr = False
+
+
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestChebyFits(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
@@ -103,6 +111,7 @@ class TestChebyFits(unittest.TestCase):
         self.assertTrue(os.path.isfile('tmpResids'))
 
 
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestRun(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')

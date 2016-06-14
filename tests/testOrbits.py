@@ -7,6 +7,14 @@ from lsst.sims.movingObjects import Orbits
 from lsst.utils import getPackageDir
 
 
+try:
+    import numexpr
+    _has_numexpr = True
+except ImportError:
+    _has_numexpr = False
+
+
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestOrbits(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')

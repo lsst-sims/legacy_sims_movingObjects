@@ -10,6 +10,14 @@ from lsst.sims.movingObjects import PyOrbEphemerides
 from lsst.utils import getPackageDir
 
 
+try:
+    import numexpr
+    _has_numexpr = True
+except ImportError:
+    _has_numexpr = False
+
+
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestPyOrbEphemerides(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
@@ -114,6 +122,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
             np.testing.assert_allclose(ephsAllKEP[column], ephsAll[column], rtol=0, atol=1e-7)
 
 
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestJPLValues(unittest.TestCase):
     """Test the oorb generated RA/Dec values against JPL generated RA/Dec values."""
     def setUp(self):

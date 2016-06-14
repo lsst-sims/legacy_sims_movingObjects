@@ -12,6 +12,14 @@ from lsst.sims.movingObjects import ChebyValues
 from lsst.utils import getPackageDir
 
 
+try:
+    import numexpr
+    _has_numexpr = True
+except ImportError:
+    _has_numexpr = False
+
+
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestChebyValues(unittest.TestCase):
     def setUp(self):
         self.testdatadir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
@@ -103,6 +111,7 @@ class TestChebyValues(unittest.TestCase):
         self.assertEqual(len(ephemerides['ra']), 3)
 
 
+@unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestJPLValues(unittest.TestCase):
     # Test the interpolation-generated RA/Dec values against JPL generated RA/Dec values.
     # The resulting errors should be similar to the errors reported
