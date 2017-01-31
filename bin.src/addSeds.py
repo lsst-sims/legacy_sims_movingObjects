@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import os
+import argparse
+import warnings
+import numpy as np
+from lsst.sims.movingObjects import Orbits
+from itertools import repeat
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Add SEDs to a series of orbits.")
+    parser.add_argument("--orbitFile", type=str, default=None,
+                        help="File containing the orbits.")
+    parser.add_argument("--outFile", type=str, default=None,
+                        help="Output orbit file.")
+    args = parser.parse_args()
+
+    # Parse orbit file input values.
+    if args.orbitFile is None:
+        print("Must specify orbit file to use.")
+        exit()
+
+    if not os.path.isfile(args.orbitFile):
+        print("Could not find orbit file %s" % (args.orbitFile))
+    if args.orbitFile.lower().endswith('s3m'):
+        skiprows = 1
+    else:
+        skiprows = 0
+
+    # Read orbits. This adds SEDs with the default setup automatically.
+    orbits = Orbits()
+    orbits.readOrbits(args.orbitFile, skiprows=skiprows)
+
+    # An alternative method to assign the seds:
+    # sedfilenames = orbits.assignSed(orbits.orbits, randomSeed=None)
+    formatcol = np.array([x for x in repeat(orbits.format, len(orbits.orbits))])
+    orbits.orbits.insert(1, 'FORMAT', formatcol)
+    orbits.orbits.to_csv(args.outFile, sep=' ', index=False, header=True)

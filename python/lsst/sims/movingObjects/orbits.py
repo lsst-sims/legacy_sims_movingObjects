@@ -1,4 +1,3 @@
-from itertools import repeat
 import warnings
 import numpy as np
 import pandas as pd
@@ -58,7 +57,8 @@ class Orbits(object):
         If objid is not present in orbits, a sequential series of integers will be used.
         If H is not present in orbits, a default value of 20 will be used.
         If g is not present in orbits, a default value of 0.15 will be used.
-        If sed_filename is not present in orbits, a default value of 'C.dat' will be used.
+        If sed_filename is not present in orbits, either C or S type will be assigned,
+        according to the semi-major axis value.
 
         Parameters
         ----------
@@ -121,8 +121,7 @@ class Orbits(object):
         if 'g' not in orbits:
             orbits['g'] = np.zeros(nSso) + 0.15
         if 'sed_filename' not in orbits:
-            sedvals = [sed for sed in repeat('C.dat', nSso)]
-            orbits['sed_filename'] = np.array(sedvals)
+            orbits['sed_filename'] = self.assignSed(orbits)
 
         # Make sure we gave all the columns we need.
         for col in self.dataCols[self.format]:
@@ -136,6 +135,43 @@ class Orbits(object):
                           ' - was this intended? (continuing).')
         # All is good.
         self.orbits = orbits
+
+    def assignSed(self, orbits, randomSeed=None):
+        """Assign either a C or S type SED, depending on the semi-major axis of the object.
+        P(C type) = 0 (a<2); 0.5*a - 1 (2<a<4); 1 (a > 4),
+        based on figure 23 from Ivezic et al 2001 (AJ, 122, 2749).
+
+        Parameters
+        ----------
+        orbits : pandas.DataFrame, pandas.Series or numpy.ndarray
+           Array-like object containing orbital parameter information.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array containing the SED type for each object in 'orbits'.
+        """
+        # using fig. 23 from Ivezic et al. 2001 (AJ, 122, 2749),
+        # we can approximate the sed types with a simple linear form:
+        #  p(C) = 0 for a<2
+        #  p(C) = 0.5*a-1  for 2<a<4
+        #  p(C) = 1 for a>4
+        # where a is semi-major axis, and p(C) is the probability that
+        # an asteroid is C type, with p(S)=1-p(C) for S types.
+        if 'a' in orbits:
+            a = orbits['a']
+        elif 'q' in orbits:
+            a = orbits['q'] / (1 - orbits['e'])
+        else:
+            raise ValueError('Need either a or q (plus e) in orbit data frame.')
+        sedvals = np.empty(len(orbits), dtype=str)
+        if randomSeed is not None:
+            np.random.seed(randomSeed)
+        chance = np.random.random(len(orbits))
+        prob_c = 0.5 * a - 1.0
+        # if chance <= prob_c:
+        sedvals = np.where(chance <= prob_c, 'C.dat', 'S.dat')
+        return sedvals
 
     def readOrbits(self, orbitfile, delim=None, skiprows=None):
         """Read orbits from a file, generating a pandas dataframe containing columns matching

@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest
 import os
+import numpy as np
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
@@ -75,7 +76,7 @@ class TestOrbits(unittest.TestCase):
         """
         Test that we can slice and iterate through an orbits
         dataframe that has already been sub-selected from another
-        datafram
+        dataframe.
         """
         orbits0 = Orbits()
         orbits0.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
@@ -150,6 +151,25 @@ class TestOrbits(unittest.TestCase):
         newOrbits = Orbits()
         with self.assertRaises(ValueError):
             newOrbits.setOrbits(neworbits)
+
+    def testSetSeds(self):
+        """
+        Test that the self-assignment of SEDs works as expected.
+        """
+        orbits = Orbits()
+        # Test with a range of a values.
+        a = np.arange(0, 5, .05)
+        orbs = pd.DataFrame(a, columns=['a'])
+        seds = orbits.assignSed(orbs)
+        self.assertEqual(np.unique(seds[np.where(a < 2)]), 'S.dat')
+        self.assertEqual(np.unique(seds[np.where(a > 4)]), 'C.dat')
+        # Test when read a values.
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
+        sedvals = orbits.assignSed(orbits.orbits, randomSeed=42)
+        orbits2 = Orbits()
+        orbits2.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
+        sedvals2 = orbits2.assignSed(orbits2.orbits, randomSeed=42)
+        np.testing.assert_array_equal(sedvals, sedvals2)
 
 if __name__ == '__main__':
     unittest.main()
