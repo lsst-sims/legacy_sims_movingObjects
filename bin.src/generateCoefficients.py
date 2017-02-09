@@ -41,6 +41,8 @@ if __name__ == '__main__':
                         " and to 14 for NEOs.")
     parser.add_argument("--nCoeff", type=int, default=14,
                         help="Number of coefficients to use for the position polynomials. Default 14.")
+    parser.add_argument("--outDir", type=str, default='.',
+                        help="Output directory. Default current directory.")
     args = parser.parse_args()
 
     # Parse orbit file input values.
@@ -103,8 +105,12 @@ if __name__ == '__main__':
         # Put this here to make code checker happy (and to guard against deletion of earlier check).
         raise ValueError("Must specify at least one of tSpan or tEnd")
 
+    if not os.path.isdir(args.outDir):
+        os.makedirs(args.outDir)
+
     fileRoot = '.'.join(args.orbitFile.split('.')[:-1])
-    logFile = '__'.join([fileRoot, 'log', fileSuffix]).rstrip('_')
+    fileRoot = os.path.join(args.outDir, fileRoot)
+    logFile = '__'.join(['__'.join(fileRoot, tStart), 'log', fileSuffix]).rstrip('_')
     log = open(logFile, 'w')
 
     timespans = np.arange(tStart, tEnd, tSpan)
