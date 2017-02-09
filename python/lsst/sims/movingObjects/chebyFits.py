@@ -301,10 +301,10 @@ class ChebyFits(object):
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find good segment length to meet '
-                             'skyTolerance %f milli-arcseconds within %d iterations\n'
-                             % (self.skyTolerance, maxIterations)
-                             + 'Final residual was %f milli-arcseconds' % pos_resid)
+            errorMessage = 'Could not find good segment length to meet skyTolerance %f' % (self.skyTolerance)
+            errorMessage += ' milliarcseconds within %d iterations. ' % (maxIterations)
+            errorMessage += 'Final residual was %f milli-arcseconds.' % (pos_resid)
+            raise ValueError(errorMessage)
         else:
             self.length = length
 
