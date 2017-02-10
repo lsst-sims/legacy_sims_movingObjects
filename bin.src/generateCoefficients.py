@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
     fileRoot = '.'.join(args.orbitFile.split('.')[:-1])
     fileRoot = os.path.join(args.outDir, fileRoot)
-    logFile = '__'.join(['__'.join(fileRoot, tStart), 'log', fileSuffix]).rstrip('_')
+    logFile = '__'.join([fileRoot, 'log', '%.2f' % (tStart), fileSuffix]).rstrip('_')
     log = open(logFile, 'w')
 
     timespans = np.arange(tStart, tEnd, tSpan)
