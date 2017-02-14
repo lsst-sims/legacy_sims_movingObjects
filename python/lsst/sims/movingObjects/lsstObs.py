@@ -1,4 +1,5 @@
 from __future__ import print_function
+import os
 import warnings
 
 import lsst.sims.photUtils.Bandpass as Bandpass
@@ -19,9 +20,21 @@ class LsstObs(object):
     Class to generate actual LSST observations of a set of moving objects.
     Currently uses ChebyShev polynomials fit, should allow simple linear interpolation too.
     """
-    def __init__(self, logfile='obslog'):
+    def __init__(self, logfile='obslog', cameraFootprint=True,
+                 filterDir=None, sedDir=None):
         self.logfile = open(logfile, 'w')
-        self._setupCamera()
+        # Set up camera object (used for footprint).
+        if cameraFootprint:
+            self._setupCamera()
+        else:
+            self.mapper = None
+            self.camera = None
+            self.epoch = 2000.0
+            self.cameraFov = np.radians(1.75)
+        # Set up dictionary to store colors of various object seds.
+        self._setupFilters(filterDir=filterDir, vDir=sedDir)
+        self.colors = {}
+
 
     def _setupCamera(self):
         """
@@ -31,6 +44,40 @@ class LsstObs(object):
         self.camera = self.mapper.camera
         self.epoch = 2000.0
         self.cameraFov=np.radians(2.1)
+
+    def _setupFilters(self, filterDir=None, vDir=None,
+                      filterlist=('u', 'g', 'r', 'i', 'z', 'y')):
+        """
+        Read LSST and Harris (V) filters.
+
+        Parameters
+        ----------
+        filterDir : str (opt)
+            Directory containing the filter throughput curves ('total_*.dat')
+            Default set by 'LSST_THROUGHPUTS_BASELINE' env variable.
+        vDir : str (opt)
+            Directory containing the V band throughput curve.
+            Default set by 'SED_DIR' env variable.
+        filterlist : list (opt)
+            List containing the filter names to use to calculate colors.
+            Default ('u', 'g', 'r', 'i', 'z', 'y')
+        """
+        if filterDir is None:
+            filterDir = os.getenv('LSST_THROUGHPUTS_BASELINE')
+        if filterDir is None:
+            raise ValueError('Please set filterDir or env variable LSST_THROUGHPUTS_BASELINE')
+        if vDir is None:
+            vDir = os.getenv('SED_DIR')
+        if vDir is None:
+            raise ValueError('Please set vDir or env variable SED_DIR')
+        self.filterlist = filterlist
+        # Read filter throughput curves from disk.
+        self.lsst = {}
+        for f in self.filterlist:
+            self.lsst[f] = Bandpass()
+            self.lsst[f].readThroughput(os.path.join(filterDir, 'total_' + f + '.dat'))
+        self.vband = Bandpass()
+        self.vband.readThroughput(os.path.join(vDir, 'harris_V.dat'))
 
     def readOpsim(self, opsimfile, sqlconstraint=None, dbcols=None):
         # Read opsim database.
@@ -49,30 +96,16 @@ class LsstObs(object):
         print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata['expMJD'])),
               file=self.logfile)
 
-    def calcColors(self, sedname='C.dat', filterDir=None, sedDir=None):
+    def _calcColors(self, sedname='C.dat'):
         """
-        Calculate the colors for a moving object with sed 'sedname'.
+        Calculate the colors for a given SED.
+
+        Parameters
+        ----------
+        sedname : str (opt)
+            Name of the SED. Default 'C.dat'.
         """
-        # Do we need to read in the LSST bandpasses?
-        try:
-            self.lsst
-        except AttributeError:
-            if filterDir is None:
-                filterDir = os.getenv('LSST_THROUGHPUTS_BASELINE')
-            if filterDir is None:
-                raise ValueError('Please set filterDir or env variable LSST_THROUGHPUTS_BASELINE')
-            self.filterlist = ('u', 'g', 'r', 'i', 'z', 'y')
-            self.lsst ={}
-            for f in self.filterlist:
-                self.lsst[f] = Bandpass()
-                self.lsst[f].readThroughput(os.path.join(filterDir, 'total_'+f+'.dat'))
-            if self.sedDir is None:
-                self.sedDir = os.getenv('SED_DIR')
-            if self.sedDir is None:
-                raise ValueError('Please set sedDir or env variable SED_DIR')
-            self.vband = Bandpass()
-            self.vband.readThroughput(os.path.join(self.sedDir, 'harris_V.dat'))
-            self.colors = {}
+
         # See if the sed's colors are in memory already.
         if sedname not in self.colors:
             moSed = Sed()
@@ -81,7 +114,7 @@ class LsstObs(object):
             self.colors[sedname] = {}
             for f in self.filterlist:
                 self.colors[sedname][f] = moSed.calcMag(self.lsst[f]) - vmag
-        return self.colors[sedname]
+        return
 
     def calcMagLosses(self, velocity, seeing, texp=30.):
         """
