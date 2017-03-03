@@ -23,8 +23,12 @@ class ChebyFits(object):
     Chebyshev Polynomial, using the routines in chebyshevUtils.py.
     Many chebyshev polynomials are used to fit one moving object over a given timeperiod;
     typically, the length of each segment is typically about 2 days for MBAs.
-    The start and end of each segment must match exactly, and the entire segments must fit into the total
-    timespan an integer number of times.
+    The start and end of each segment must match exactly, and the entire segments must
+    fit into the total timespan an integer number of times. This is accomplished by setting nDecimal to
+    the number of decimal places desired in the 'time' value. For faster moving objects, this number needs
+    be greater to allow for smaller subdivisions. It's tempting to allow flexibility to the point of not
+    enforcing this for non-database use; however, then the resulting ephemeris may have multiple values
+    depending on which polynomial segment was used to calculate the ephemeris.
     The length of each chebyshev polynomial is related to the number of ephemeris positions used to fit that
     polynomial by ngran:
     length = timestep * ngran
@@ -41,7 +45,7 @@ class ChebyFits(object):
     tStart : float
         The starting point in time to fit coefficients. MJD.
     tSpan : float
-        The time span (starting at tStart) to fit coefficients. Days.
+        The time span (starting at tStart) over which to fit coefficients. Days.
     timeScale : {'TAI', 'UTC', 'TT'}
         The timescale of the MJD time, tStart, and the timeScale that should be
         used with the chebyshev coefficients.
@@ -462,8 +466,10 @@ class ChebyFits(object):
             newCheby.calcSegmentLength()
         except ValueError as ve:
             # Could not find a good segment length.
-            warnings.warn('Objid %s, segment %f to %f - error: %s'
-                          % (orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1], ve.message))
+            warningmessage = 'Objid %s, segment %f to %f ' % (orbitObj.orbits.objId.iloc[0],
+                                                              ephs['time'][0], ephs['time'][-1])
+            warningmessage += ' - error: %s' % (ve.message)
+            warnings.warn(warningmessage)
             self.failed += newCheby.failed
             return
         newCheby.calcSegments()
