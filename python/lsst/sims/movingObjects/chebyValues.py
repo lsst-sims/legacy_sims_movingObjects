@@ -132,7 +132,11 @@ class ChebyValues(object):
             The ephemeris positions for all objects.
             Note that these may not be sorted in the same order as objIds.
         """
+        if isinstance(time, float) or isinstance(time, int):
+            time = np.array([time], float)
+        ntimes = len(time)
         ephemerides = {}
+        # Find subset of segments which match objId, if specified.
         if objIds is None:
             objMatch = np.ones(len(self.coeffs['objId']), dtype=bool)
             ephemerides['objId'] = np.unique(self.coeffs['objId'])
@@ -141,16 +145,36 @@ class ChebyValues(object):
                 objIds = np.array([objIds])
             objMatch = np.in1d(self.coeffs['objId'], objIds)
             ephemerides['objId'] = objIds
-        ephemerides['time'] = np.zeros(len(ephemerides['objId']), float) + time
+        # Now find ephemeris values.
+        ephemerides['time'] = np.zeros((len(ephemerides['objId']), ntimes), float) + time
         for k in self.ephemerisKeys:
-            ephemerides[k] = np.zeros(len(ephemerides['objId']), float)
-        segments = np.where((self.coeffs['tStart'][objMatch] <= time) &
-                            (self.coeffs['tEnd'][objMatch] > time))[0]
-        for i, segmentIdx in enumerate(segments):
-            ephemeris = self._evalSegment(segmentIdx, time, objMatch)
-            for k in self.ephemerisKeys:
-                ephemerides[k][i] = ephemeris[k]
-            ephemerides['objId'][i] = self.coeffs['objId'][objMatch][segmentIdx]
+            ephemerides[k] = np.zeros((len(ephemerides['objId']), ntimes), float)
+        for it, t in enumerate(time):
+            # Find subset of segments which contain the appropriate time.
+            # Look for simplest subset first.
+            segments = np.where((self.coeffs['tStart'][objMatch] <= t) &
+                                (self.coeffs['tEnd'][objMatch] > t))[0]
+            if len(segments) == 0:
+                segStart = self.coeffs['tStart'][objMatch].min()
+                segEnd = self.coeffs['tEnd'][objMatch].max()
+                if (segStart > t or segEnd < t):
+                    if not extrapolate:
+                        for k in self.ephemerisKeys:
+                            ephemerides[k][i][it] = np.nan
+                    else:
+                        # Find the segments to use to extrapolate the times.
+                        if segStart > t:
+                            segments = np.where(self.coeffs['tStart'][objMatch] == segStart)[0]
+                        if segEnd < t:
+                            segments = np.where(self.coeffs['tEnd'][objMatch] == segEnd)[0]
+                elif segEnd == t:
+                    # Not extrapolating, but outside the simple match case above.
+                    segments = np.where(self.coeffs['tEnd'][objMatch] == segEnd)[0]
+            for i, segmentIdx in enumerate(segments):
+                ephemeris = self._evalSegment(segmentIdx, t, objMatch, mask=False)
+                for k in self.ephemerisKeys:
+                    ephemerides[k][i][it] = ephemeris[k]
+                ephemerides['objId'][i] = self.coeffs['objId'][objMatch][segmentIdx]
         if objIds is not None:
             if set(ephemerides['objId']) != set(objIds):
                 raise ValueError('Did not find expected match between objIds provided and ephemeride objIds.')
