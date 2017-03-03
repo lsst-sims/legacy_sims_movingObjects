@@ -9,7 +9,7 @@ __all__ = ['chebeval', 'chebfit']
 
 # Evaluation routine.
 
-def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
+def chebeval(x, p, interval=(-1., 1.), doVelocity=True, mask=False):
     """Evaluate a Chebyshev series and first derivative at points x.
 
     If p is of length n + 1, this function returns:
@@ -28,9 +28,11 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
         Chebyshev polynomial coefficients, as returned by chebfit.
     interval: 2-element list/tuple
         Bounds the x-interval on which the Chebyshev coefficients were fit.
-    doVelocity: bool.
+    doVelocity: bool
         If True, compute the first derivative at points x.
-
+    mask: bool
+        If True, return Nans when the x goes beyond 'interval'.
+        If False, extrapolate fit beyond 'interval' limits.
     Returns
     -------
     scalar or numpy.ndarray, scalar or numpy.ndarray
@@ -74,6 +76,10 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
             v0 = v2
             v1 = v3
 
+        if mask:
+            mask = np.where((x < intervalBegin) | (x > intervalEnd), True, False)
+            y = np.where(mask, np.nan, y)
+            v = np.where(mask, np.nan, v)
         return y, 2 * v / (intervalEnd - intervalBegin)
     else:
         for i in np.arange(0, N, 2):
@@ -83,7 +89,9 @@ def chebeval(x, p, interval=(-1., 1.), doVelocity=True):
             y += p[i] * y0 + p[j] * y1
             y0 = t * y1 - y0
             y1 = t * y0 - y1
-
+        if mask:
+            mask = np.where((x < intervalBegin) | (x > intervalEnd), True, False)
+            y = np.where(mask, np.nan, y)
         return y, None
 
 # Fitting routines.
@@ -303,7 +311,7 @@ def chebfit(t, x, dxdt=None, xMultiplier=None, dxMultiplier=None, nPoly=7):
         redoV = (dxMultiplier.shape[1] != nPoints) | (dxMultiplier.shape[0] != nPoly)
 
     if (dxdt is None) & redoX:
-        xMultiplier, _ = makeChebMatrixOnlyX(nPoints, nPoly)
+        xMultiplier = makeChebMatrixOnlyX(nPoints, nPoly)
 
     if (dxdt is not None) & (redoV | redoX):
         xMultiplier, dxMultiplier = makeChebMatrix(nPoints, nPoly)

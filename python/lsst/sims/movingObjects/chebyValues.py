@@ -69,17 +69,19 @@ class ChebyValues(object):
         for k in coeff_cols:
             self.coeffs[k] = self.coeffs[k].swapaxes(0, 1)
 
-    def _evalSegment(self, segmentIdx, time, subsetSegments=None):
-        """Evaluate the ra/dec/delta/vmag/elongation values for a given segment at a given time.
+    def _evalSegment(self, segmentIdx, times, subsetSegments=None, mask=True):
+        """Evaluate the ra/dec/delta/vmag/elongation values for a given segment at a series of times.
 
         Parameters
         ----------
         segmentIdx : int
-            The index in self.coeffs for the segment.
-        time : float
-            The time at which to evaluate the segment.
+            The index in (each of) self.coeffs for the segment.
+            e.g. the first segment, for each object.
+        time : np.ndarray
+            The times at which to evaluate the segment.
         subsetSegments : numpy.ndarray, optional
             Optionally specify a subset of the total segment indexes.
+            This lets you pick out particular objIds.
 
         Returns
         -------
@@ -91,34 +93,38 @@ class ChebyValues(object):
             subsetSegments = np.ones(len(self.coeffs['objId']), dtype=bool)
         tStart = self.coeffs['tStart'][subsetSegments][segmentIdx]
         tEnd = self.coeffs['tEnd'][subsetSegments][segmentIdx]
-        if (time < tStart) or (time > tEnd):
-            raise ValueError('Time requested (%f) is out of bounds for segment index (valid %f to %f).'
-                             % (time, tStart, tEnd))
-        tScaled = time - tStart
+        tScaled = times - tStart
         tInterval = np.array([tStart, tEnd]) - tStart
         # Evaluate RA/Dec/Delta/Vmag/elongation.
         ephemeris = {}
         ephemeris['ra'], ephemeris['dradt'] = cheb.chebeval(tScaled,
                                                             self.coeffs['ra'][subsetSegments][segmentIdx],
-                                                            interval=tInterval, doVelocity=True)
+                                                            interval=tInterval, doVelocity=True, mask=mask)
         ephemeris['dec'], ephemeris['ddecdt'] = cheb.chebeval(tScaled,
                                                               self.coeffs['dec'][subsetSegments][segmentIdx],
-                                                              interval=tInterval, doVelocity=True)
+                                                              interval=tInterval, doVelocity=True, mask=mask)
         ephemeris['dradt'] = ephemeris['dradt'] * np.cos(np.radians(ephemeris['dec']))
         for k in ('delta', 'vmag', 'elongation'):
             ephemeris[k], _ = cheb.chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
-                                            interval=tInterval, doVelocity=False)
+                                            interval=tInterval, doVelocity=False, mask=mask)
         return ephemeris
 
-    def getEphemerides(self, time, objIds=None):
+    def getEphemerides(self, time, objIds=None, extrapolate=False):
         """Find the ephemeris information for 'objIds' at 'time'.
+
+        Implicit in how this is currently written is that the segments are all expected to cover the
+        same start/end time range across all objects.
+        They do not have to have the same segment length for all objects.
 
         Parameters
         ----------
-        time : float
+        time : float or np.ndarray
             The time to calculate ephemeris positions.
         objIds : numpy.ndarray, optional
             The object ids for which to generate ephemerides. If None, then just uses all objects.
+        extrapolate : bool
+            If True, extrapolate beyond ends of segments if time outside of segment range.
+            If False, return ValueError if time is beyond range of segments.
 
         Returns
         -------
