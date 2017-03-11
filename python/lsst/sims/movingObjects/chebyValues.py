@@ -160,7 +160,7 @@ class ChebyValues(object):
                 if (segStart > t or segEnd < t):
                     if not extrapolate:
                         for k in self.ephemerisKeys:
-                            ephemerides[k][i][it] = np.nan
+                            ephemerides[k][:,it] = np.nan
                     else:
                         # Find the segments to use to extrapolate the times.
                         if segStart > t:
