@@ -35,7 +35,6 @@ class LsstObs(object):
         self._setupFilters(filterDir=filterDir, vDir=sedDir)
         self.colors = {}
 
-
     def _setupCamera(self):
         """
         Initialize LSST camera mapper.
@@ -79,26 +78,9 @@ class LsstObs(object):
         self.vband = Bandpass()
         self.vband.readThroughput(os.path.join(vDir, 'harris_V.dat'))
 
-    def readOpsim(self, opsimfile, sqlconstraint=None, dbcols=None):
-        # Read opsim database.
-        opsdb = OpsimDatabase(opsimfile)
-        if dbcols is None:
-            dbcols = []
-        # Be sure the minimum columns that we need are in place.
-        # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-        #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
-        reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-                   'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
-        for col in reqcols:
-            if col not in dbcols:
-                dbcols.append(col)
-        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=sqlconstraint)
-        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata['expMJD'])),
-              file=self.logfile)
-
     def _calcColors(self, sedname='C.dat'):
         """
-        Calculate the colors for a given SED.
+        Calculate the colors for a given SED, store the result.
 
         Parameters
         ----------
@@ -116,7 +98,7 @@ class LsstObs(object):
                 self.colors[sedname][f] = moSed.calcMag(self.lsst[f]) - vmag
         return
 
-    def calcMagLosses(self, velocity, seeing, texp=30.):
+    def _calcMagLosses(self, velocity, seeing, texp=30.):
         """
         Calculate the magnitude losses due to trailing and not matching the point-source detection filter.
         """
@@ -128,6 +110,26 @@ class LsstObs(object):
         dmagTrail = 1.25 * np.log10(1 + a_trail*x**2/(1+b_trail*x))
         dmagDetect = 1.25 * np.log10(1 + a_det*x**2 / (1+b_det*x))
         return dmagTrail, dmagDetect
+
+    def readOpsim(self, opsimfile, sqlconstraint=None, dbcols=None):
+        # Read opsim database.
+        opsdb = OpsimDatabase(opsimfile)
+        if dbcols is None:
+            dbcols = []
+        # Be sure the minimum columns that we need are in place.
+        # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+        #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
+        reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+                   'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
+        for col in reqcols:
+            if col not in dbcols:
+                dbcols.append(col)
+        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=sqlconstraint)
+        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata['expMJD'])),
+              file=self.logfile)
+        return simdata
+
+
 
     def _openOutput(self, outfileName):
         self.outfile = open(outfileName, 'w')
