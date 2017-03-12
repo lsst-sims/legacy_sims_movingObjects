@@ -28,6 +28,7 @@ class TestChebyValues(unittest.TestCase):
         self.failedFile = 'test_failed'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdatadir, 'test_orbitsNEO.s3m'), skiprows=1)
+        #self.orbits.readOrbits(os.path.join(self.testdatadir, 'tmp.s3m'), skiprows=1)
         self.pyephems = PyOrbEphemerides(os.path.join(os.getenv('OORB_DATA'), 'DE405.dat'))
         self.pyephems.setOrbits(self.orbits)
         self.tStart = self.orbits.orbits.epoch.iloc[0]
@@ -46,11 +47,11 @@ class TestChebyValues(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.chebyFits
-        os.remove(self.coeffFile)
+        #os.remove(self.coeffFile)
         os.remove(self.residFile)
         if os.path.isfile(self.failedFile):
             os.remove(self.failedFile)
-
+    """
     def testSetCoeff(self):
         # Test setting coefficients directly from chebyFits outputs.
         chebyValues = ChebyValues()
@@ -83,7 +84,7 @@ class TestChebyValues(unittest.TestCase):
                 # print out with in chebyFits. Since vmag, delta and elongation only use 7
                 # decimal places, this means we can test to 5 decimal places for those.
                 np.testing.assert_allclose(chebyValues.coeffs[k], chebyValues2.coeffs[k], rtol=0, atol=1e-5)
-
+    """
     def testGetEphemerides(self):
         # Test that getEphemerides works and is accurate.
         chebyValues = ChebyValues()
@@ -96,13 +97,13 @@ class TestChebyValues(unittest.TestCase):
         pyephemerides = self.pyephems.generateEphemerides(time, obscode=807,
                                                           timeScale='TAI', byObject=False)
         # RA and Dec should agree to 2.5mas (skyTolerance above)
-        pos_residuals = np.sqrt((ephemerides['ra'] - pyephemerides['ra'][0]) ** 2 +
-                                ((ephemerides['dec'] - pyephemerides['dec'][0]) *
-                                 np.cos(np.radians(ephemerides['dec']))) ** 2)
+        pos_residuals = np.sqrt((ephemerides['ra'][:,0] - pyephemerides['ra'][0]) ** 2 +
+                                ((ephemerides['dec'][:,0] - pyephemerides['dec']) *
+                                 np.cos(np.radians(ephemerides['dec'][:,0]))) ** 2)
         pos_residuals *= 3600.0 * 1000.0
         # Let's just look at the max residuals in all quantities.
         for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
-            resids = np.abs(ephemerides[k] - pyephemerides[k][0])
+            resids = np.abs(ephemerides[k][:,0] - pyephemerides[k][0])
             if k != 'delta':
                 resids *= 3600.0 * 1000.0
             print('max diff', k, np.max(resids))
