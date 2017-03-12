@@ -508,6 +508,10 @@ class ChebyFits(object):
             header += ' '.join(['elongation_%d' % x for x in range(self.nCoeff['elongation'])])
         else:
             header = None
+        if (not append) or (not os.path.isfile(residFile)):
+            resid_header = 'objId segNum tStart tEnd length pos delta vmag elong'
+        else:
+            resid_header = None
         timeformat = '%.' + '%s' % self.nDecimal + 'f'
         with open(coeffFile, openMode) as f:
             if header is not None:
@@ -525,6 +529,8 @@ class ChebyFits(object):
                                                    " ".join('%.7e' % j for j in cE)), file=f)
 
         with open(residFile, openMode) as f:
+            if resid_header is not None:
+                print(resid_header, file=f)
             for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in \
                     enumerate(zip(self.resids['objId'], self.resids['tStart'],
                                   self.resids['tEnd'], self.resids['pos'],
