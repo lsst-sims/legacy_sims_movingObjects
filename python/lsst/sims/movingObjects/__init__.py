@@ -28,3 +28,4 @@ from .ephemerides import *
 from .chebyFits import *
 from .chebyValues import *
 from .chebyshevUtils import *
+from .linearObs import *

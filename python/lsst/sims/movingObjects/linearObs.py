@@ -1,10 +1,9 @@
+from __future__ import print_function, division
 import os
 import warnings
 import numpy as np
-import pandas as pd
 
 from itertools import repeat
-import pyoorb as oo
 from scipy import interpolate
 
 import lsst.sims.photUtils.Bandpass as Bandpass
@@ -28,10 +27,13 @@ class LinearObs(Orbits):
     Linear interpolation between gridpoint of ephemerides.
     Inherits from Orbits to read orbits.
     """
-    def __init__(self, orbitFile, delim=None, skiprows=None, ephfile=None):
+    def __init__(self, orbitFile, delim=None, skiprows=None, ephfile=None,
+                 timescale='TAI', obscode=807):
         super(LinearObs, self).__init__()
         self.readOrbits(orbitfile=orbitFile, delim=None, skiprows=None)
         self.pyephem = PyOrbEphemerides(ephfile=ephfile)
+        self.timescale = self.pyephem.timeScales[timescale]
+        self.obscode = obscode
 
     def setTimesRange(self, timeStep=1., timeStart=49353., timeEnd=453003.):
         """
@@ -47,21 +49,22 @@ class LinearObs(Orbits):
         times = np.arange(timeStart, timeEnd + timeStep/2.0, timeStep)
         # For pyoorb, we need to tag times with timescales;
         # 1= MJD_UTC, 2=UT1, 3=TT, 4=TAI
-        self.ephTimes = np.array(zip(times, repeat(4, len(times))), dtype='double', order='F')
+        self.ephTimes = np.array(zip(times, repeat(self.timescale, len(times))), dtype='double', order='F')
 
     def setTimes(self, times):
         """
         Set an array for oorb of the ephemeris times desired, given an explicit set of times.
         @ times : numpy array of the actual times of each ephemeris position.
         """
-        self.ephTimes = np.array(zip(times, repeat(4, len(times))), dtype='double', order='F')
+        self.ephTimes = np.array(zip(times, repeat(self.timescale, len(times))), dtype='double', order='F')
 
 
-    def generateEphs(self, sso, obscode=807):
+    def generateEphs(self, sso):
         """Generate ephemerides for all times in self.ephTimes.
         """
         self.pyephem.setOrbits(sso)
-        ephs = pyephem.generateEphemerides(self.ephTimes, timeScale='UTC', obscode=obscode, byObject=True)
+        oorbEphs = self.pyephem._generateOorbEphs(self.ephTimes, obscode=self.obscode)
+        ephs = self.pyephem._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 
     # Linear interpolation
@@ -84,7 +87,7 @@ class LinearObs(Orbits):
         self.mapper = LsstSimMapper()
         self.camera = self.mapper.camera
         self.epoch = 2000.0
-        self.cameraFov=np.radians(2.1)
+        self.cameraFov = np.radians(2.1)
 
     def ssoInFov(self, interpfuncs, simdata, rFov=np.radians(1.75),
                  useCamera=True,
@@ -238,22 +241,23 @@ class LinearObs(Orbits):
 
 
 ## Function to link the above class methods to generate an output file with moving object observations.
-
 def runLinearObs(orbitfile, outfileName, opsimfile,
-            dbcols=None, tstep=2./24., sqlconstraint='',
-            rFov=np.radians(1.75), useCamera=True):
+                 dbcols=None, tstep=2./24., sqlconstraint='',
+                 rFov=np.radians(1.75), useCamera=True,
+                 obscode=807):
 
     from lsst.sims.maf.db import OpsimDatabase
 
     # Read orbits.
-    moogen = LinearObs(orbitfile)
-    print "Read orbit information from %s" %(orbitfile)
+    lObs = LinearObs(orbitfile, obscode=obscode, timescale='TAI')
+    print("Read orbit information from %s" %(orbitfile))
 
     # Check rfov/camera choices.
     if useCamera:
-        print "Using camera footprint"
+        print("Using camera footprint")
     else:
-        print "Not using camera footprint; using circular fov with %f degrees radius" %(np.degrees(rFov))
+        print("Not using camera footprint; using circular fov with %f degrees radius"
+              % (np.degrees(rFov)))
 
     # Read opsim database.
     opsdb = OpsimDatabase(opsimfile)
@@ -268,18 +272,21 @@ def runLinearObs(orbitfile, outfileName, opsimfile,
         if col not in dbcols:
             dbcols.append(col)
     simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=sqlconstraint)
-    print "Queried data from opsim %s, fetched %d visits." %(opsimfile, len(simdata['expMJD']))
+    print("Queried data from opsim %s, fetched %d visits." %(opsimfile, len(simdata['expMJD'])))
 
-    moogen.setTimesRange(timeStep=tstep, timeStart=simdata['expMJD'].min(), timeEnd=simdata['expMJD'].max())
-    print "Will generate ephemerides on grid of %f day timesteps, then extrapolate to opsim times." %(tstep)
+    lObs.setTimesRange(timeStep=tstep, timeStart=simdata['expMJD'].min(), timeEnd=simdata['expMJD'].max())
+    print("Will generate ephemerides on grid of %f day timesteps, then extrapolate to opsim times."
+          % (tstep))
 
-    for sso in moogen.orbits:
-        ephs = moogen.generateEphs(sso)
-        interpfuncs = moogen.interpolateEphs(ephs)
-        idxObs = moogen.ssoInFov(interpfuncs, simdata, rFov=rFov, useCamera=useCamera)
-        moogen.writeObs(sso.orbits['objId'], interpfuncs, simdata, idxObs,
-                        sedname=sso.orbits['sed_filename'], outfileName=outfileName)
-    print "Wrote output observations to file %s" %(outfileName)
+    for sso in lObs:
+        objid = sso.orbits['objId'].iloc[0]
+        sedname = sso.orbits['sed_filename'].iloc[0]
+        ephs = lObs.generateEphs(sso)
+        interpfuncs = lObs.interpolateEphs(ephs)
+        idxObs = lObs.ssoInFov(interpfuncs, simdata, rFov=rFov, useCamera=useCamera)
+        lObs.writeObs(objid, interpfuncs, simdata, idxObs,
+                      sedname=sedname, outfileName=outfileName)
+    print("Wrote output observations to file %s" %(outfileName))
 
 # Test example:
 if __name__ == '__main__':

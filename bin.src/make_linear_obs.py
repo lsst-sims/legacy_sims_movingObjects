@@ -7,7 +7,7 @@ from lsst.sims.movingObjects import runLinearObs
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generate moving object detections."
-                                                 " This tool uses linear interpolations, when generating"
+                                                 " This tool uses linear interpolations when generating"
                                                  " observations for a particular opsim run.")
     parser.add_argument("opsimDb", type=str, help="Opsim run db file")
     parser.add_argument("--orbitFile", type=str, default='pha20141031.des',
@@ -15,11 +15,13 @@ if __name__ == '__main__':
     parser.add_argument("--outDir", type=str,
                         default='.', help="Output directory for moving object detections.")
     parser.add_argument("--obsFile", type=str, default=None,
-                        help="Output file name for moving object observations. "
-                             "Default will build opsimRun_orbitFile_obs.txt.")
+                        help="Output file name for moving object observations."
+                             " Default will build opsimRun_orbitFile_obs.txt.")
     parser.add_argument("--tStep", type=float, default=2./24.0,
-                        help="Timestep between ephemeris generation / linear interpolation steps (in days). "
-                             "Default 2 hours.")
+                        help="Timestep between ephemeris generation / linear interpolation steps (in days)."
+                             " Default 2 hours.")
+    parser.add_argument("--sqlConstraint", type=str, default='',
+                        help="SQL constraint to use to select data from opsimDb. Default no constraint.")
     args = parser.parse_args()
 
     print('Making moving object observations from %s for opsim run %s' % (args.orbitFile, args.opsimDb))
@@ -31,4 +33,5 @@ if __name__ == '__main__':
     else:
         obsFile = args.obsFile
 
-    runLinearObs(args.orbitFile, obsFile, args.opsimDb, tstep=args.tStep, useCamera=True)
+    runLinearObs(args.orbitFile, obsFile, args.opsimDb, tstep=args.tStep, useCamera=True,
+                 sqlconstraint=args.sqlConstraint)
