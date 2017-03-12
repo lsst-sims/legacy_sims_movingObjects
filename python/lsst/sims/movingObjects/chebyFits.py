@@ -89,7 +89,7 @@ class ChebyFits(object):
         self.nDecimal = int(nDecimal)
         self.tStart = round(tStart, self.nDecimal)
         self.tSpan = round(tSpan, self.nDecimal)
-        self.tEnd = self.tStart + self.tSpan
+        self.tEnd = round(self.tStart + self.tSpan, self.nDecimal)
         # print('input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix())
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
@@ -205,22 +205,22 @@ class ChebyFits(object):
         length = round(length, self.nDecimal)
         length_in = length
         # Make length an integer value within the time interval, to last decimal place accuracy.
-        tolerance = 10. ** (-1 * self.nDecimal)
         counter = 0
         prev_int_factor = 0
-        while ((self.tSpan % length) > tolerance) and (length > 0) and (counter < 20):
+        numTolerance = 10. ** (-1 * self.nDecimal)
+        while ((self.tSpan % length) > numTolerance) and (length > 0) and (counter < 20):
             int_factor = int(self.tSpan / length) + 1  # round up / ceiling
             if int_factor == prev_int_factor:
                 int_factor = prev_int_factor + 1
             prev_int_factor = int_factor
             length = round(self.tSpan / int_factor, self.nDecimal)
             counter += 1
-        if (self.tSpan % length) > tolerance or (length <= 0):
+        if (self.tSpan % length) > numTolerance or (length <= 0):
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
             raise ValueError('Could not find a suitable length for the timespan (start %f, span %f), '
-                             'starting with %s, ending at %f'
+                             'starting with length %s, ending with length value %f'
                              % (self.tStart, self.tSpan, str(length_in), length))
         return length
 
@@ -381,15 +381,16 @@ class ChebyFits(object):
         # For some objects, we will end up recalculating the ephemeride values, but most should be fine.
         times = self.makeAllTimes()
         ephs = self.generateEphemerides(times)
+        eps = self._lengthToTimestep(self.length)/4.0
         # Loop through each object to generate coefficients.
         for orbitObj, e in zip(self.orbitsObj, ephs):
             tSegmentStart = self.tStart
             # Cycle through all segments until we reach the end of the period we're fitting.
-            while tSegmentStart < self.tEnd:
+            while tSegmentStart < (self.tEnd - eps):
                 # Identify the subset of times and ephemerides which are relevant for this segment
                 # (at the default segment size).
                 tSegmentEnd = round(tSegmentStart + self.length, self.nDecimal)
-                subset = np.where((times >= tSegmentStart) & (times <= tSegmentEnd))
+                subset = np.where((times >= tSegmentStart) & (times < tSegmentEnd + eps))
                 self.calcOneSegment(orbitObj, e[subset])
                 tSegmentStart = tSegmentEnd
 
