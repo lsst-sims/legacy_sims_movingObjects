@@ -27,7 +27,7 @@ class TestOrbits(unittest.TestCase):
         orbits2.readOrbits(os.path.join(self.testdir, 'test_orbitsQ.des'))
         self.assertEqual(orbits, orbits2)
         orbits3 = Orbits()
-        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
+        orbits3.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.assertNotEqual(orbits, orbits3)
 
     def testIterationAndIndexing(self):

@@ -51,7 +51,7 @@ class TestChebyValues(unittest.TestCase):
         os.remove(self.residFile)
         if os.path.isfile(self.failedFile):
             os.remove(self.failedFile)
-    """
+
     def testSetCoeff(self):
         # Test setting coefficients directly from chebyFits outputs.
         chebyValues = ChebyValues()
@@ -84,7 +84,7 @@ class TestChebyValues(unittest.TestCase):
                 # print out with in chebyFits. Since vmag, delta and elongation only use 7
                 # decimal places, this means we can test to 5 decimal places for those.
                 np.testing.assert_allclose(chebyValues.coeffs[k], chebyValues2.coeffs[k], rtol=0, atol=1e-5)
-    """
+
     def testGetEphemerides(self):
         # Test that getEphemerides works and is accurate.
         chebyValues = ChebyValues()
@@ -120,7 +120,7 @@ class TestChebyValues(unittest.TestCase):
         ephemerides = chebyValues.getEphemerides(time + self.interval * 2, objIds, extrapolate=False)
         self.assertTrue(np.isnan(ephemerides['ra'][0]))
 
-"""
+
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestJPLValues(unittest.TestCase):
     # Test the interpolation-generated RA/Dec values against JPL generated RA/Dec values.
@@ -177,8 +177,8 @@ class TestJPLValues(unittest.TestCase):
             # Sometimes I've had to reorder both, sometimes just the ephs. ??
             jorder = np.argsort(j['objId'])
             jorder = np.arange(0, len(jorder))
-            dRA = np.abs(ephs['ra'][ephorder] - j['ra_deg'][jorder]) * 3600.0 * 1000.0
-            dDec = np.abs(ephs['dec'][ephorder] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
+            dRA = np.abs(ephs['ra'][ephorder][:,0] - j['ra_deg'][jorder]) * 3600.0 * 1000.0
+            dDec = np.abs(ephs['dec'][ephorder][:,0] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
             deltaRA[i] = dRA.max()
             deltaDec[i] = dDec.max()
             if deltaRA[i] > 18:
@@ -196,7 +196,7 @@ class TestJPLValues(unittest.TestCase):
         self.assertTrue(np.max(deltaDec) < 6)
         self.assertTrue(np.std(deltaRA) < 2)
         self.assertTrue(np.std(deltaDec) < 1)
-"""
+
 
 if __name__ == '__main__':
     unittest.main()
