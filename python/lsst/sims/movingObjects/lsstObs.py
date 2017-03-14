@@ -1,15 +1,14 @@
 from __future__ import print_function
 import os
-import warnings
 
 import lsst.sims.photUtils.Bandpass as Bandpass
 import lsst.sims.photUtils.Sed as Sed
 
-from lsst.sims.utils import haversine
+from lsst.sims.utils import angularSeparation
 from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
-from lsst.obs.lsstSim import LsstSimMapper
-from lsst.sims.coordUtils import chipNameFromRaDec
+from lsst.sims.coordUtils import chipNameFromRaDecLSST
+from lsst.utils import getPackageDir
 
 from lsst.sims.maf.db import OpsimDatabase
 
@@ -20,29 +19,15 @@ class LsstObs(object):
     Class to generate actual LSST observations of a set of moving objects.
     Currently uses ChebyShev polynomials fit, should allow simple linear interpolation too.
     """
-    def __init__(self, logfile='obslog', cameraFootprint=True,
-                 filterDir=None, sedDir=None):
+    def __init__(self, logfile='obslog', cameraFootprint=True):
         self.logfile = open(logfile, 'w')
         # Set up camera object (used for footprint).
-        if cameraFootprint:
-            self._setupCamera()
-        else:
-            self.mapper = None
-            self.camera = None
-            self.epoch = 2000.0
-            self.cameraFov = np.radians(1.75)
-        # Set up dictionary to store colors of various object seds.
-        self.setupFilters(filterDir=filterDir, vDir=sedDir)
-        self.colors = {}
-
-    def _setupCamera(self):
-        """
-        Initialize LSST camera mapper.
-        """
-        self.mapper = LsstSimMapper()
-        self.camera = self.mapper.camera
         self.epoch = 2000.0
-        self.cameraFov=np.radians(2.1)
+        if cameraFootprint:
+            self.fov = 2.1
+        else:
+            self.fov = 1.75
+        self.colors = {}
 
     def setupFilters(self, filterDir=None, vDir=None,
                       filterlist=('u', 'g', 'r', 'i', 'z', 'y')):
@@ -56,7 +41,7 @@ class LsstObs(object):
             Default set by 'LSST_THROUGHPUTS_BASELINE' env variable.
         vDir : str (opt)
             Directory containing the V band throughput curve.
-            Default set by 'SED_DIR' env variable.
+            Default None = $SIMS_MOVINGOBJECTS_DIR/data.
         filterlist : list (opt)
             List containing the filter names to use to calculate colors.
             Default ('u', 'g', 'r', 'i', 'z', 'y')
@@ -66,9 +51,7 @@ class LsstObs(object):
         if filterDir is None:
             raise ValueError('Please set filterDir or env variable LSST_THROUGHPUTS_BASELINE')
         if vDir is None:
-            vDir = os.getenv('SED_DIR')
-        if vDir is None:
-            raise ValueError('Please set vDir or env variable SED_DIR')
+            vDir = os.path.join(getPackageDir('SIMS_MOVINGOBJECTS'), 'data')
         self.filterlist = filterlist
         # Read filter throughput curves from disk.
         self.lsst = {}
@@ -78,7 +61,7 @@ class LsstObs(object):
         self.vband = Bandpass()
         self.vband.readThroughput(os.path.join(vDir, 'harris_V.dat'))
 
-    def calcColors(self, sedname='C.dat'):
+    def calcColors(self, sedname='C.dat', sedDir=None):
         """
         Calculate the colors for a given SED, store the result.
 
@@ -86,12 +69,16 @@ class LsstObs(object):
         ----------
         sedname : str (opt)
             Name of the SED. Default 'C.dat'.
+        sedDir : str (opt)
+            Directory containing the SEDs of the moving objects.
+            Default None = $SIMS_MOVINGOBJECTS_DIR/data.
         """
-
         # See if the sed's colors are in memory already.
         if sedname not in self.colors:
+            if sedDir is None:
+                sedDir = os.path.join(getPackageDir('SIMS_MOVINGOBJECTS'), 'data')
             moSed = Sed()
-            moSed.readSED_flambda(os.path.join(self.sedDir, sedname))
+            moSed.readSED_flambda(os.path.join(sedDir, sedname))
             vmag = moSed.calcMag(self.vband)
             self.colors[sedname] = {}
             for f in self.filterlist:
@@ -111,7 +98,7 @@ class LsstObs(object):
         dmagDetect = 1.25 * np.log10(1 + a_det*x**2 / (1+b_det*x))
         return dmagTrail, dmagDetect
 
-    def readOpsim(self, opsimfile, constraint=None, dbcols=None):
+    def readOpsim(self, opsimfile, constraint=None, dbcols=None, expMJDCol='expMJD'):
         # Read opsim database.
         opsdb = OpsimDatabase(opsimfile)
         if dbcols is None:
@@ -119,17 +106,15 @@ class LsstObs(object):
         # Be sure the minimum columns that we need are in place.
         # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
         #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
-        reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+        reqcols = [expMJDCol, 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
                    'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
         for col in reqcols:
             if col not in dbcols:
                 dbcols.append(col)
         simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
-        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata['expMJD'])),
+        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata[expMJDCol])),
               file=self.logfile)
         return simdata
-
-
 
     def _openOutput(self, outfileName):
         self.outfile = open(outfileName, 'w')
