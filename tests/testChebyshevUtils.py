@@ -13,7 +13,7 @@ class TestChebgrid(unittest.TestCase):
         self.mbaDict = {}
         for day in range(2, 4):
             self.mbaDict[day] = pickle.load(open(os.path.join(getPackageDir('sims_movingObjects'),
-                                                              "tests/cheb_testdata/day%i.pkl" % (day)), "rb"))
+                                                              "tests/cheb_testdata/day%d.pkl" % (day)), "rb"))
 
     def test_raise_error(self):
         x = np.linspace(-1, 1, 9)
