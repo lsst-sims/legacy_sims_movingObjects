@@ -32,7 +32,8 @@ class TestChebgrid(unittest.TestCase):
         self.assertTrue(np.allclose(yy_woutVel, yy_wVel))
         # Test that we get a nan for a value outside the range of the 'interval', if mask=True
         yy_wVel, vv = chebyUtils.chebeval(np.linspace(-2, 1, 17), p, mask=True)
-        self.assertTrue(np.isnan(yy_wVel[0]))
+        self.assertTrue(np.isnan(yy_wVel[0]),
+                        msg='Expected NaN for masked/out of range value, but got %.2e' % (yy_wVel[0]))
 
     def test_ends_locked(self):
         x = np.linspace(-1, 1, 9)

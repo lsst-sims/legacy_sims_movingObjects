@@ -28,7 +28,6 @@ class TestChebyValues(unittest.TestCase):
         self.failedFile = 'test_failed'
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdatadir, 'test_orbitsNEO.s3m'), skiprows=1)
-        #self.orbits.readOrbits(os.path.join(self.testdatadir, 'tmp.s3m'), skiprows=1)
         self.pyephems = PyOrbEphemerides(os.path.join(os.getenv('OORB_DATA'), 'DE405.dat'))
         self.pyephems.setOrbits(self.orbits)
         self.tStart = self.orbits.orbits.epoch.iloc[0]
@@ -47,7 +46,7 @@ class TestChebyValues(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.chebyFits
-        #os.remove(self.coeffFile)
+        os.remove(self.coeffFile)
         os.remove(self.residFile)
         if os.path.isfile(self.failedFile):
             os.remove(self.failedFile)
@@ -111,14 +110,15 @@ class TestChebyValues(unittest.TestCase):
         print('max diff elongation', np.max(resids))
         resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
         print('max diff vmag', np.max(resids))
-        self.assertTrue(np.max(pos_residuals) <= 2.5)
+        self.assertLessEqual(np.max(pos_residuals), 2.5)
         # Test for single time, but for a subset of the objects.
         objIds = self.orbits.orbits.objId.head(3).as_matrix()
         ephemerides = chebyValues.getEphemerides(time, objIds)
         self.assertEqual(len(ephemerides['ra']), 3)
         # Test for time outside of segment range.
         ephemerides = chebyValues.getEphemerides(time + self.interval * 2, objIds, extrapolate=False)
-        self.assertTrue(np.isnan(ephemerides['ra'][0]))
+        self.assertTrue(np.isnan(ephemerides['ra'][0]),
+                        msg='Expected Nan for out of range ephemeris, got %.2e' %(ephemerides['ra'][0]))
 
 
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
@@ -159,10 +159,10 @@ class TestJPLValues(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.jpl
-        #os.remove(self.coeffFile)
-        #os.remove(self.residFile)
-        #if os.path.isfile(self.failedFile):
-        #    os.remove(self.failedFile)
+        os.remove(self.coeffFile)
+        os.remove(self.residFile)
+        if os.path.isfile(self.failedFile):
+            os.remove(self.failedFile)
 
     def testRADec(self):
         # We won't compare Vmag, because this also needs information on trailing losses.
@@ -192,10 +192,10 @@ class TestJPLValues(unittest.TestCase):
         # This is consistent with the errors/values reported by oorb directly in testEphemerides.
         print('max JPL errors', deltaRA.max(), deltaDec.max())
         print('std of JPL errors', np.std(deltaRA), np.std(deltaDec))
-        self.assertTrue(np.max(deltaRA) < 18)
-        self.assertTrue(np.max(deltaDec) < 6)
-        self.assertTrue(np.std(deltaRA) < 2)
-        self.assertTrue(np.std(deltaDec) < 1)
+        self.assertLess(np.max(deltaRA), 18)
+        self.assertLess(np.max(deltaDec), 6)
+        self.assertLess(np.std(deltaRA), 2)
+        self.assertLess(np.std(deltaDec), 1)
 
 
 if __name__ == '__main__':
