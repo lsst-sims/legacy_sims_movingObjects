@@ -5,7 +5,7 @@ Implementation of Newhall, X. X. 1989, Celestial Mechanics, 45, p. 305-310
 
 import numpy as np
 
-__all__ = ['chebeval', 'chebfit']
+__all__ = ['chebeval', 'chebfit', 'makeChebMatrix', 'makeChebMatrixOnlyX']
 
 # Evaluation routine.
 

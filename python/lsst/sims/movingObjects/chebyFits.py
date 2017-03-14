@@ -2,7 +2,7 @@ from __future__ import print_function, division
 import os
 import warnings
 import numpy as np
-import chebyshevUtils as cheb
+from .chebyshevUtils import chebfit, makeChebMatrix, makeChebMatrixOnlyX
 from .orbits import Orbits
 from .ephemerides import PyOrbEphemerides
 
@@ -137,11 +137,11 @@ class ChebyFits(object):
         # The nPoints are predetermined here, based on Yusra's earlier work.
         # The weight is based on Newhall, X. X. 1989, Celestial Mechanics, 45, p. 305-310
         self.multipliers = {}
-        self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
-                                                           self.nCoeff['position'], weight=0.16)
-        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
-        self.multipliers['delta'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
-        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
+        self.multipliers['position'] = makeChebMatrix(self.ngran + 1,
+                                                      self.nCoeff['position'], weight=0.16)
+        self.multipliers['vmag'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
+        self.multipliers['delta'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
+        self.multipliers['elongation'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
 
     def _lengthToTimestep(self, length):
         """Convert chebyshev polynomial segment lengths to the corresponding timestep over the segment.
@@ -333,16 +333,15 @@ class ChebyFits(object):
         """
         dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
         coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = \
-            cheb.chebfit(ephs['time'], three_sixty_to_neg(ephs['ra']),
-                         dxdt=dradt_coord,
-                         xMultiplier=self.multipliers['position'][0],
-                         dxMultiplier=self.multipliers['position'][1],
-                         nPoly=self.nCoeff['position'])
+            chebfit(ephs['time'], three_sixty_to_neg(ephs['ra']), dxdt=dradt_coord,
+                    xMultiplier=self.multipliers['position'][0],
+                    dxMultiplier=self.multipliers['position'][1],
+                    nPoly=self.nCoeff['position'])
         coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = \
-            cheb.chebfit(ephs['time'], ephs['dec'], dxdt=ephs['ddecdt'],
-                         xMultiplier=self.multipliers['position'][0],
-                         dxMultiplier=self.multipliers['position'][1],
-                         nPoly=self.nCoeff['position'])
+            chebfit(ephs['time'], ephs['dec'], dxdt=ephs['ddecdt'],
+                    xMultiplier=self.multipliers['position'][0],
+                    dxMultiplier=self.multipliers['position'][1],
+                    nPoly=self.nCoeff['position'])
         max_pos_resid = np.max(np.sqrt(resid_dec**2 +
                                        (resid_ra * np.cos(np.radians(ephs['dec'])))**2))
         # Convert position residuals to mas.
@@ -367,11 +366,9 @@ class ChebyFits(object):
         coeffs = {}
         max_resids = {}
         for key, ephValue in zip(('delta', 'vmag', 'elongation'), ('delta', 'magV', 'solarelon')):
-            coeffs[key], resid, rms, max_resids[key] = cheb.chebfit(ephs['time'], ephs[ephValue],
-                                                                    dxdt=None,
-                                                                    xMultiplier=self.multipliers[key],
-                                                                    dxMultiplier=None,
-                                                                    nPoly=self.nCoeff[key])
+            coeffs[key], resid, rms, max_resids[key] = chebfit(ephs['time'], ephs[ephValue], dxdt=None,
+                                                               xMultiplier=self.multipliers[key],
+                                                               dxMultiplier=None, nPoly=self.nCoeff[key])
         return coeffs, max_resids
 
     def calcSegments(self):

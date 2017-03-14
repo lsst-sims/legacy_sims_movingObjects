@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-import chebyshevUtils as cheb
+from .chebyshevUtils import chebeval
 
 __all__ = ['ChebyValues']
 
@@ -100,16 +100,16 @@ class ChebyValues(object):
         tInterval = np.array([tStart, tEnd]) - tStart
         # Evaluate RA/Dec/Delta/Vmag/elongation.
         ephemeris = {}
-        ephemeris['ra'], ephemeris['dradt'] = cheb.chebeval(tScaled,
-                                                            self.coeffs['ra'][subsetSegments][segmentIdx],
-                                                            interval=tInterval, doVelocity=True, mask=mask)
-        ephemeris['dec'], ephemeris['ddecdt'] = cheb.chebeval(tScaled,
-                                                              self.coeffs['dec'][subsetSegments][segmentIdx],
-                                                              interval=tInterval, doVelocity=True, mask=mask)
+        ephemeris['ra'], ephemeris['dradt'] = chebeval(tScaled,
+                                                       self.coeffs['ra'][subsetSegments][segmentIdx],
+                                                       interval=tInterval, doVelocity=True, mask=mask)
+        ephemeris['dec'], ephemeris['ddecdt'] = chebeval(tScaled,
+                                                         self.coeffs['dec'][subsetSegments][segmentIdx],
+                                                         interval=tInterval, doVelocity=True, mask=mask)
         ephemeris['dradt'] = ephemeris['dradt'] * np.cos(np.radians(ephemeris['dec']))
         for k in ('delta', 'vmag', 'elongation'):
-            ephemeris[k], _ = cheb.chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
-                                            interval=tInterval, doVelocity=False, mask=mask)
+            ephemeris[k], _ = chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
+                                       interval=tInterval, doVelocity=False, mask=mask)
         return ephemeris
 
     def getEphemerides(self, times, objIds=None, extrapolate=False):
