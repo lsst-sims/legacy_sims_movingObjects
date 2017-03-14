@@ -1,12 +1,11 @@
 setupRequired(base)
 setupRequired(utils)
 setupRequired(numpy)
+setupRequired(pandas)
 setupRequired(oorb)
 setupRequired(astropy)
 
-# other requirements (not in LSST stack)
-# supplied by ana/mini-conda.
-# pandas, numexpr
+setupRequired(throughputs)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
