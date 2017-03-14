@@ -7,6 +7,7 @@ setupRequired(astropy)
 
 setupRequired(throughputs)
 setupRequired(sims_photUtils)
+setupRequired(sims_coordUtils)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
