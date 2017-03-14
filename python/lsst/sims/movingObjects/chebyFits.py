@@ -2,7 +2,7 @@ from __future__ import print_function, division
 import os
 import warnings
 import numpy as np
-import chebyshevUtils as cheb
+from .chebyshevUtils import chebfit, makeChebMatrix, makeChebMatrixOnlyX
 from .orbits import Orbits
 from .ephemerides import PyOrbEphemerides
 
@@ -23,8 +23,12 @@ class ChebyFits(object):
     Chebyshev Polynomial, using the routines in chebyshevUtils.py.
     Many chebyshev polynomials are used to fit one moving object over a given timeperiod;
     typically, the length of each segment is typically about 2 days for MBAs.
-    The start and end of each segment must match exactly, and the entire segments must fit into the total
-    timespan an integer number of times.
+    The start and end of each segment must match exactly, and the entire segments must
+    fit into the total timespan an integer number of times. This is accomplished by setting nDecimal to
+    the number of decimal places desired in the 'time' value. For faster moving objects, this number needs
+    be greater to allow for smaller subdivisions. It's tempting to allow flexibility to the point of not
+    enforcing this for non-database use; however, then the resulting ephemeris may have multiple values
+    depending on which polynomial segment was used to calculate the ephemeris.
     The length of each chebyshev polynomial is related to the number of ephemeris positions used to fit that
     polynomial by ngran:
     length = timestep * ngran
@@ -41,7 +45,7 @@ class ChebyFits(object):
     tStart : float
         The starting point in time to fit coefficients. MJD.
     tSpan : float
-        The time span (starting at tStart) to fit coefficients. Days.
+        The time span (starting at tStart) over which to fit coefficients. Days.
     timeScale : {'TAI', 'UTC', 'TT'}
         The timescale of the MJD time, tStart, and the timeScale that should be
         used with the chebyshev coefficients.
@@ -85,7 +89,7 @@ class ChebyFits(object):
         self.nDecimal = int(nDecimal)
         self.tStart = round(tStart, self.nDecimal)
         self.tSpan = round(tSpan, self.nDecimal)
-        self.tEnd = self.tStart + self.tSpan
+        self.tEnd = round(self.tStart + self.tSpan, self.nDecimal)
         # print('input times', self.tStart, self.tSpan, self.tEnd, orbitsObj.orbits.objId.as_matrix())
         if timeScale.upper() == 'TAI':
             self.timeScale = 'TAI'
@@ -133,11 +137,11 @@ class ChebyFits(object):
         # The nPoints are predetermined here, based on Yusra's earlier work.
         # The weight is based on Newhall, X. X. 1989, Celestial Mechanics, 45, p. 305-310
         self.multipliers = {}
-        self.multipliers['position'] = cheb.makeChebMatrix(self.ngran + 1,
-                                                           self.nCoeff['position'], weight=0.16)
-        self.multipliers['vmag'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
-        self.multipliers['delta'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
-        self.multipliers['elongation'] = cheb.makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
+        self.multipliers['position'] = makeChebMatrix(self.ngran + 1,
+                                                      self.nCoeff['position'], weight=0.16)
+        self.multipliers['vmag'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
+        self.multipliers['delta'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
+        self.multipliers['elongation'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
 
     def _lengthToTimestep(self, length):
         """Convert chebyshev polynomial segment lengths to the corresponding timestep over the segment.
@@ -201,22 +205,22 @@ class ChebyFits(object):
         length = round(length, self.nDecimal)
         length_in = length
         # Make length an integer value within the time interval, to last decimal place accuracy.
-        tolerance = 10. ** (-1 * self.nDecimal)
         counter = 0
         prev_int_factor = 0
-        while ((self.tSpan % length) > tolerance) and (length > 0) and (counter < 20):
+        numTolerance = 10. ** (-1 * self.nDecimal)
+        while ((self.tSpan % length) > numTolerance) and (length > 0) and (counter < 20):
             int_factor = int(self.tSpan / length) + 1  # round up / ceiling
             if int_factor == prev_int_factor:
                 int_factor = prev_int_factor + 1
             prev_int_factor = int_factor
             length = round(self.tSpan / int_factor, self.nDecimal)
             counter += 1
-        if (self.tSpan % length) > tolerance or (length <= 0):
+        if (self.tSpan % length) > numTolerance or (length <= 0):
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
             raise ValueError('Could not find a suitable length for the timespan (start %f, span %f), '
-                             'starting with %s, ending at %f'
+                             'starting with length %s, ending with length value %f'
                              % (self.tStart, self.tSpan, str(length_in), length))
         return length
 
@@ -301,10 +305,10 @@ class ChebyFits(object):
             # Add this entire segment into the failed list.
             for objId in self.orbitsObj.orbits['objId'].as_matrix():
                 self.failed.append((objId, self.tStart, self.tEnd))
-            raise ValueError('Could not find good segment length to meet '
-                             'skyTolerance %f milli-arcseconds within %d iterations\n'
-                             % (self.skyTolerance, maxIterations)
-                             + 'Final residual was %f milli-arcseconds' % pos_resid)
+            errorMessage = 'Could not find good segment length to meet skyTolerance %f' % (self.skyTolerance)
+            errorMessage += ' milliarcseconds within %d iterations. ' % (maxIterations)
+            errorMessage += 'Final residual was %f milli-arcseconds.' % (pos_resid)
+            raise ValueError(errorMessage)
         else:
             self.length = length
 
@@ -329,16 +333,15 @@ class ChebyFits(object):
         """
         dradt_coord = ephs['dradt'] / np.cos(np.radians(ephs['dec']))
         coeff_ra, resid_ra, rms_ra_resid, max_ra_resid = \
-            cheb.chebfit(ephs['time'], three_sixty_to_neg(ephs['ra']),
-                         dxdt=dradt_coord,
-                         xMultiplier=self.multipliers['position'][0],
-                         dxMultiplier=self.multipliers['position'][1],
-                         nPoly=self.nCoeff['position'])
+            chebfit(ephs['time'], three_sixty_to_neg(ephs['ra']), dxdt=dradt_coord,
+                    xMultiplier=self.multipliers['position'][0],
+                    dxMultiplier=self.multipliers['position'][1],
+                    nPoly=self.nCoeff['position'])
         coeff_dec, resid_dec, rms_dec_resid, max_dec_resid = \
-            cheb.chebfit(ephs['time'], ephs['dec'], dxdt=ephs['ddecdt'],
-                         xMultiplier=self.multipliers['position'][0],
-                         dxMultiplier=self.multipliers['position'][1],
-                         nPoly=self.nCoeff['position'])
+            chebfit(ephs['time'], ephs['dec'], dxdt=ephs['ddecdt'],
+                    xMultiplier=self.multipliers['position'][0],
+                    dxMultiplier=self.multipliers['position'][1],
+                    nPoly=self.nCoeff['position'])
         max_pos_resid = np.max(np.sqrt(resid_dec**2 +
                                        (resid_ra * np.cos(np.radians(ephs['dec'])))**2))
         # Convert position residuals to mas.
@@ -363,11 +366,9 @@ class ChebyFits(object):
         coeffs = {}
         max_resids = {}
         for key, ephValue in zip(('delta', 'vmag', 'elongation'), ('delta', 'magV', 'solarelon')):
-            coeffs[key], resid, rms, max_resids[key] = cheb.chebfit(ephs['time'], ephs[ephValue],
-                                                                    dxdt=None,
-                                                                    xMultiplier=self.multipliers[key],
-                                                                    dxMultiplier=None,
-                                                                    nPoly=self.nCoeff[key])
+            coeffs[key], resid, rms, max_resids[key] = chebfit(ephs['time'], ephs[ephValue], dxdt=None,
+                                                               xMultiplier=self.multipliers[key],
+                                                               dxMultiplier=None, nPoly=self.nCoeff[key])
         return coeffs, max_resids
 
     def calcSegments(self):
@@ -377,15 +378,16 @@ class ChebyFits(object):
         # For some objects, we will end up recalculating the ephemeride values, but most should be fine.
         times = self.makeAllTimes()
         ephs = self.generateEphemerides(times)
+        eps = self._lengthToTimestep(self.length)/4.0
         # Loop through each object to generate coefficients.
         for orbitObj, e in zip(self.orbitsObj, ephs):
             tSegmentStart = self.tStart
             # Cycle through all segments until we reach the end of the period we're fitting.
-            while tSegmentStart < self.tEnd:
+            while tSegmentStart < (self.tEnd - eps):
                 # Identify the subset of times and ephemerides which are relevant for this segment
                 # (at the default segment size).
                 tSegmentEnd = round(tSegmentStart + self.length, self.nDecimal)
-                subset = np.where((times >= tSegmentStart) & (times <= tSegmentEnd))
+                subset = np.where((times >= tSegmentStart) & (times < tSegmentEnd + eps))
                 self.calcOneSegment(orbitObj, e[subset])
                 tSegmentStart = tSegmentEnd
 
@@ -462,8 +464,10 @@ class ChebyFits(object):
             newCheby.calcSegmentLength()
         except ValueError as ve:
             # Could not find a good segment length.
-            warnings.warn('Objid %s, segment %f to %f - error: %s'
-                          % (orbitObj.orbits.objId.iloc[0], ephs['time'][0], ephs['time'][-1], ve.message))
+            warningmessage = 'Objid %s, segment %f to %f ' % (orbitObj.orbits.objId.iloc[0],
+                                                              ephs['time'][0], ephs['time'][-1])
+            warningmessage += ' - error: %s' % (ve.message)
+            warnings.warn(warningmessage)
             self.failed += newCheby.failed
             return
         newCheby.calcSegments()
@@ -502,6 +506,10 @@ class ChebyFits(object):
             header += ' '.join(['elongation_%d' % x for x in range(self.nCoeff['elongation'])])
         else:
             header = None
+        if (not append) or (not os.path.isfile(residFile)):
+            resid_header = 'objId segNum tStart tEnd length pos delta vmag elong'
+        else:
+            resid_header = None
         timeformat = '%.' + '%s' % self.nDecimal + 'f'
         with open(coeffFile, openMode) as f:
             if header is not None:
@@ -519,6 +527,8 @@ class ChebyFits(object):
                                                    " ".join('%.7e' % j for j in cE)), file=f)
 
         with open(residFile, openMode) as f:
+            if resid_header is not None:
+                print(resid_header, file=f)
             for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in \
                     enumerate(zip(self.resids['objId'], self.resids['tStart'],
                                   self.resids['tEnd'], self.resids['pos'],

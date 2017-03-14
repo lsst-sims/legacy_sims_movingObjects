@@ -151,7 +151,7 @@ class PyOrbEphemerides(object):
             times = np.array([times])
         if len(times) == 0:
             raise ValueError('Got zero times to convert for OpenOrb')
-        ephTimes = np.array(zip(times, repeat(self.timeScales[timeScale], len(times))),
+        ephTimes = np.array(list(zip(times, repeat(self.timeScales[timeScale], len(times)))),
                             dtype='double', order='F')
         return ephTimes
 

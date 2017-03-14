@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-import chebyshevUtils as cheb
+from .chebyshevUtils import chebeval
 
 __all__ = ['ChebyValues']
 
@@ -69,17 +69,22 @@ class ChebyValues(object):
         for k in coeff_cols:
             self.coeffs[k] = self.coeffs[k].swapaxes(0, 1)
 
-    def _evalSegment(self, segmentIdx, time, subsetSegments=None):
-        """Evaluate the ra/dec/delta/vmag/elongation values for a given segment at a given time.
+    def _evalSegment(self, segmentIdx, times, subsetSegments=None, mask=True):
+        """Evaluate the ra/dec/delta/vmag/elongation values for a given segment at a series of times.
 
         Parameters
         ----------
         segmentIdx : int
-            The index in self.coeffs for the segment.
-        time : float
-            The time at which to evaluate the segment.
+            The index in (each of) self.coeffs for the segment.
+            e.g. the first segment, for each object.
+        times : np.ndarray
+            The times at which to evaluate the segment.
         subsetSegments : numpy.ndarray, optional
             Optionally specify a subset of the total segment indexes.
+            This lets you pick out particular objIds.
+        mask : bool, optional
+            If True, returns NaNs for values outside the range of times in the segment.
+            If False, extrapolates segment for times outside the segment time range.
 
         Returns
         -------
@@ -91,34 +96,38 @@ class ChebyValues(object):
             subsetSegments = np.ones(len(self.coeffs['objId']), dtype=bool)
         tStart = self.coeffs['tStart'][subsetSegments][segmentIdx]
         tEnd = self.coeffs['tEnd'][subsetSegments][segmentIdx]
-        if (time < tStart) or (time > tEnd):
-            raise ValueError('Time requested (%f) is out of bounds for segment index (valid %f to %f).'
-                             % (time, tStart, tEnd))
-        tScaled = time - tStart
+        tScaled = times - tStart
         tInterval = np.array([tStart, tEnd]) - tStart
         # Evaluate RA/Dec/Delta/Vmag/elongation.
         ephemeris = {}
-        ephemeris['ra'], ephemeris['dradt'] = cheb.chebeval(tScaled,
-                                                            self.coeffs['ra'][subsetSegments][segmentIdx],
-                                                            interval=tInterval, doVelocity=True)
-        ephemeris['dec'], ephemeris['ddecdt'] = cheb.chebeval(tScaled,
-                                                              self.coeffs['dec'][subsetSegments][segmentIdx],
-                                                              interval=tInterval, doVelocity=True)
+        ephemeris['ra'], ephemeris['dradt'] = chebeval(tScaled,
+                                                       self.coeffs['ra'][subsetSegments][segmentIdx],
+                                                       interval=tInterval, doVelocity=True, mask=mask)
+        ephemeris['dec'], ephemeris['ddecdt'] = chebeval(tScaled,
+                                                         self.coeffs['dec'][subsetSegments][segmentIdx],
+                                                         interval=tInterval, doVelocity=True, mask=mask)
         ephemeris['dradt'] = ephemeris['dradt'] * np.cos(np.radians(ephemeris['dec']))
         for k in ('delta', 'vmag', 'elongation'):
-            ephemeris[k], _ = cheb.chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
-                                            interval=tInterval, doVelocity=False)
+            ephemeris[k], _ = chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
+                                       interval=tInterval, doVelocity=False, mask=mask)
         return ephemeris
 
-    def getEphemerides(self, time, objIds=None):
+    def getEphemerides(self, times, objIds=None, extrapolate=False):
         """Find the ephemeris information for 'objIds' at 'time'.
+
+        Implicit in how this is currently written is that the segments are all expected to cover the
+        same start/end time range across all objects.
+        They do not have to have the same segment length for all objects.
 
         Parameters
         ----------
-        time : float
+        times : float or np.ndarray
             The time to calculate ephemeris positions.
         objIds : numpy.ndarray, optional
             The object ids for which to generate ephemerides. If None, then just uses all objects.
+        extrapolate : bool
+            If True, extrapolate beyond ends of segments if time outside of segment range.
+            If False, return ValueError if time is beyond range of segments.
 
         Returns
         -------
@@ -126,7 +135,11 @@ class ChebyValues(object):
             The ephemeris positions for all objects.
             Note that these may not be sorted in the same order as objIds.
         """
+        if isinstance(times, float) or isinstance(times, int):
+            times = np.array([times], float)
+        ntimes = len(times)
         ephemerides = {}
+        # Find subset of segments which match objId, if specified.
         if objIds is None:
             objMatch = np.ones(len(self.coeffs['objId']), dtype=bool)
             ephemerides['objId'] = np.unique(self.coeffs['objId'])
@@ -135,21 +148,37 @@ class ChebyValues(object):
                 objIds = np.array([objIds])
             objMatch = np.in1d(self.coeffs['objId'], objIds)
             ephemerides['objId'] = objIds
-        ephemerides['time'] = np.zeros(len(ephemerides['objId']), float) + time
+        # Now find ephemeris values.
+        ephemerides['time'] = np.zeros((len(ephemerides['objId']), ntimes), float) + times
         for k in self.ephemerisKeys:
-            ephemerides[k] = np.zeros(len(ephemerides['objId']), float)
-        segments = np.where((self.coeffs['tStart'][objMatch] <= time) &
-                            (self.coeffs['tEnd'][objMatch] > time))[0]
-        for i, segmentIdx in enumerate(segments):
-            ephemeris = self._evalSegment(segmentIdx, time, objMatch)
-            for k in self.ephemerisKeys:
-                ephemerides[k][i] = ephemeris[k]
-            ephemerides['objId'][i] = self.coeffs['objId'][objMatch][segmentIdx]
+            ephemerides[k] = np.zeros((len(ephemerides['objId']), ntimes), float)
+        for it, t in enumerate(times):
+            # Find subset of segments which contain the appropriate time.
+            # Look for simplest subset first.
+            segments = np.where((self.coeffs['tStart'][objMatch] <= t) &
+                                (self.coeffs['tEnd'][objMatch] > t))[0]
+            if len(segments) == 0:
+                segStart = self.coeffs['tStart'][objMatch].min()
+                segEnd = self.coeffs['tEnd'][objMatch].max()
+                if (segStart > t or segEnd < t):
+                    if not extrapolate:
+                        for k in self.ephemerisKeys:
+                            ephemerides[k][:,it] = np.nan
+                    else:
+                        # Find the segments to use to extrapolate the times.
+                        if segStart > t:
+                            segments = np.where(self.coeffs['tStart'][objMatch] == segStart)[0]
+                        if segEnd < t:
+                            segments = np.where(self.coeffs['tEnd'][objMatch] == segEnd)[0]
+                elif segEnd == t:
+                    # Not extrapolating, but outside the simple match case above.
+                    segments = np.where(self.coeffs['tEnd'][objMatch] == segEnd)[0]
+            for i, segmentIdx in enumerate(segments):
+                ephemeris = self._evalSegment(segmentIdx, t, objMatch, mask=False)
+                for k in self.ephemerisKeys:
+                    ephemerides[k][i][it] = ephemeris[k]
+                ephemerides['objId'][i] = self.coeffs['objId'][objMatch][segmentIdx]
         if objIds is not None:
             if set(ephemerides['objId']) != set(objIds):
                 raise ValueError('Did not find expected match between objIds provided and ephemeride objIds.')
         return ephemerides
-
-    def findObjectsInCircle(self, raCen, decCen, dRaDt=None, dDecDt=None, radius=1.75):
-        """Find the objects within radius of raCen/decCen."""
-        pass

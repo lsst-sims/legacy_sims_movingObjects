@@ -33,8 +33,10 @@ class TestChebyValues(unittest.TestCase):
         self.tStart = self.orbits.orbits.epoch.iloc[0]
         self.interval = 15
         self.nCoeffs = 14
+        self.nDecimal = 13
         self.chebyFits = ChebyFits(self.orbits, self.tStart, self.interval, ngran=64,
-                                   skyTolerance=2.5, nCoeff_position=self.nCoeffs, obscode=807)
+                                   skyTolerance=2.5, nDecimal=self.nDecimal, nCoeff_position=self.nCoeffs,
+                                   obscode=807, timeScale='TAI')
         self.setLength = 0.5
         self.chebyFits.calcSegmentLength(length=self.setLength)
         self.chebyFits.calcSegments()
@@ -87,28 +89,36 @@ class TestChebyValues(unittest.TestCase):
         chebyValues = ChebyValues()
         # chebyValues.setCoefficients(self.chebyFits)
         chebyValues.readCoefficients(self.coeffFile)
+        # Single time, halfway through interval.
         time = self.tStart + self.interval / 2.0
-        # Test for all objects.
+        # Test for a single time, but all the objects.
         ephemerides = chebyValues.getEphemerides(time)
         pyephemerides = self.pyephems.generateEphemerides(time, obscode=807,
                                                           timeScale='TAI', byObject=False)
         # RA and Dec should agree to 2.5mas (skyTolerance above)
-        pos_residuals = np.sqrt((ephemerides['ra'] - pyephemerides['ra'][0]) ** 2 +
-                                (ephemerides['dec'] - pyephemerides['dec'][0]) ** 2)
+        pos_residuals = np.sqrt((ephemerides['ra'][:,0] - pyephemerides['ra'][0]) ** 2 +
+                                ((ephemerides['dec'][:,0] - pyephemerides['dec']) *
+                                 np.cos(np.radians(ephemerides['dec'][:,0]))) ** 2)
         pos_residuals *= 3600.0 * 1000.0
-        self.assertTrue(np.max(pos_residuals) <= 2.5)
         # Let's just look at the max residuals in all quantities.
         for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
-            resids = np.abs(ephemerides[k] - pyephemerides[k][0])
+            resids = np.abs(ephemerides[k][:,0] - pyephemerides[k][0])
+            if k != 'delta':
+                resids *= 3600.0 * 1000.0
             print('max diff', k, np.max(resids))
         resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'][0])
         print('max diff elongation', np.max(resids))
         resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
         print('max diff vmag', np.max(resids))
-        # Test this for a subset of the objects.
+        self.assertLessEqual(np.max(pos_residuals), 2.5)
+        # Test for single time, but for a subset of the objects.
         objIds = self.orbits.orbits.objId.head(3).as_matrix()
         ephemerides = chebyValues.getEphemerides(time, objIds)
         self.assertEqual(len(ephemerides['ra']), 3)
+        # Test for time outside of segment range.
+        ephemerides = chebyValues.getEphemerides(time + self.interval * 2, objIds, extrapolate=False)
+        self.assertTrue(np.isnan(ephemerides['ra'][0]),
+                        msg='Expected Nan for out of range ephemeris, got %.2e' %(ephemerides['ra'][0]))
 
 
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
@@ -121,6 +131,7 @@ class TestJPLValues(unittest.TestCase):
         self.orbits = Orbits()
         self.jplDir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/jpl_testdata')
         self.orbits.readOrbits(os.path.join(self.jplDir, 'S0_n747.des'), skiprows=1)
+        #self.orbits.readOrbits(os.path.join(self.jplDir, 'tmp.des'), skiprows=1)
         # Read JPL ephems.
         self.jpl = pd.read_table(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)
         # Add times in TAI and UTC, because.
@@ -133,10 +144,10 @@ class TestJPLValues(unittest.TestCase):
         self.residFile = 'test_resids'
         self.failedFile = 'test_failed'
         tStart = self.jpl['mjdTAI'].min() - 0.2
-        tSpan = 1.0
-        self.chebyFits = ChebyFits(self.orbits, tStart, tSpan,
+        tEnd = self.jpl['mjdTAI'].max() + 0.2 - self.jpl['mjdTAI'].min()
+        self.chebyFits = ChebyFits(self.orbits, tStart, tEnd,
                                    ngran=64, skyTolerance=2.5,
-                                   nCoeff_position=14, obscode=807)
+                                   nDecimal=14, obscode=807)
         self.chebyFits.calcSegmentLength()
         self.chebyFits.calcSegments()
         self.chebyFits.write(self.coeffFile, self.residFile, self.failedFile, append=False)
@@ -166,8 +177,8 @@ class TestJPLValues(unittest.TestCase):
             # Sometimes I've had to reorder both, sometimes just the ephs. ??
             jorder = np.argsort(j['objId'])
             jorder = np.arange(0, len(jorder))
-            dRA = np.abs(ephs['ra'][ephorder] - j['ra_deg'][jorder]) * 3600.0 * 1000.0
-            dDec = np.abs(ephs['dec'][ephorder] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
+            dRA = np.abs(ephs['ra'][ephorder][:,0] - j['ra_deg'][jorder]) * 3600.0 * 1000.0
+            dDec = np.abs(ephs['dec'][ephorder][:,0] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
             deltaRA[i] = dRA.max()
             deltaDec[i] = dDec.max()
             if deltaRA[i] > 18:
@@ -181,10 +192,11 @@ class TestJPLValues(unittest.TestCase):
         # This is consistent with the errors/values reported by oorb directly in testEphemerides.
         print('max JPL errors', deltaRA.max(), deltaDec.max())
         print('std of JPL errors', np.std(deltaRA), np.std(deltaDec))
-        self.assertTrue(np.max(deltaRA) < 18)
-        self.assertTrue(np.max(deltaDec) < 6)
-        self.assertTrue(np.std(deltaRA) < 2)
-        self.assertTrue(np.std(deltaDec) < 1)
+        self.assertLess(np.max(deltaRA), 18)
+        self.assertLess(np.max(deltaDec), 6)
+        self.assertLess(np.std(deltaRA), 2)
+        self.assertLess(np.std(deltaDec), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
