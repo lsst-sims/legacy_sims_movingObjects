@@ -9,11 +9,12 @@ from scipy import interpolate
 import lsst.sims.photUtils.Bandpass as Bandpass
 import lsst.sims.photUtils.Sed as Sed
 
-from lsst.sims.utils import haversine
+from lsst.sims.utils import angularSeparation
 from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
-from lsst.obs.lsstSim import LsstSimMapper
-from lsst.sims.coordUtils import chipNameFromRaDec
+from lsst.sims.coordUtils import chipNameFromRaDecLSST
+
+from lsst.utils import getPackageDir
 
 from .orbits import Orbits
 from .ephemerides import PyOrbEphemerides
@@ -31,9 +32,12 @@ class LinearObs(Orbits):
                  timescale='TAI', obscode=807):
         super(LinearObs, self).__init__()
         self.readOrbits(orbitfile=orbitFile, delim=None, skiprows=None)
-        self.pyephem = PyOrbEphemerides(ephfile=ephfile)
-        self.timescale = self.pyephem.timeScales[timescale]
+        self.ephems = PyOrbEphemerides(ephfile=ephfile)
+        self.timescale = timescale
+        self.timescaleNum = self.ephems.timeScales[timescale]
         self.obscode = obscode
+        self.epoch = 2000.0
+        self.cameraFov = 2.1
 
     def setTimesRange(self, timeStep=1., timeStart=49353., timeEnd=453003.):
         """
@@ -49,22 +53,22 @@ class LinearObs(Orbits):
         times = np.arange(timeStart, timeEnd + timeStep/2.0, timeStep)
         # For pyoorb, we need to tag times with timescales;
         # 1= MJD_UTC, 2=UT1, 3=TT, 4=TAI
-        self.ephTimes = np.array(zip(times, repeat(self.timescale, len(times))), dtype='double', order='F')
+        self.ephTimes = np.array(zip(times, repeat(self.timescaleNum, len(times))), dtype='double', order='F')
 
     def setTimes(self, times):
         """
         Set an array for oorb of the ephemeris times desired, given an explicit set of times.
         @ times : numpy array of the actual times of each ephemeris position.
         """
-        self.ephTimes = np.array(zip(times, repeat(self.timescale, len(times))), dtype='double', order='F')
+        self.ephTimes = np.array(zip(times, repeat(self.timescaleNum, len(times))), dtype='double', order='F')
 
 
     def generateEphs(self, sso):
         """Generate ephemerides for all times in self.ephTimes.
         """
-        self.pyephem.setOrbits(sso)
-        oorbEphs = self.pyephem._generateOorbEphs(self.ephTimes, obscode=self.obscode)
-        ephs = self.pyephem._convertOorbEphs(oorbEphs, byObject=True)
+        self.ephems.setOrbits(sso)
+        oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
+        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 
     # Linear interpolation
@@ -80,56 +84,44 @@ class LinearObs(Orbits):
                                                   assume_sorted=True, copy=False)
         return interpfuncs
 
-    def _setupCamera(self):
-        """
-        Initialize camera mapper, etc.
-        """
-        self.mapper = LsstSimMapper()
-        self.camera = self.mapper.camera
-        self.epoch = 2000.0
-        self.cameraFov = np.radians(2.1)
-
-    def ssoInFov(self, interpfuncs, simdata, rFov=np.radians(1.75),
+    def ssoInFov(self, interpfuncs, simdata, rFov=1.75,
                  useCamera=True,
-                 simdataRaCol = 'fieldRA', simdataDecCol='fieldDec'):
+                 simdataRaCol = 'fieldRA', simdataDecCol='fieldDec', simdataExpMJDCol='expMJD'):
         """
         Return the indexes of the simdata observations where the object was inside the fov.
         """
         # See if the object is within 'rFov' of the center of the boresight.
-        raSso = np.radians(interpfuncs['ra'](simdata['expMJD']))
-        decSso = np.radians(interpfuncs['dec'](simdata['expMJD']))
-        sep = haversine(raSso, decSso, simdata[simdataRaCol], simdata[simdataDecCol])
+        raSso = interpfuncs['ra'](simdata[simdataExpMJDCol])
+        decSso = interpfuncs['dec'](simdata[simdataExpMJDCol])
+        sep = angularSeparation(raSso, decSso,
+                                np.degrees(simdata[simdataRaCol]), np.degrees(simdata[simdataDecCol]))
         if not useCamera:
             idxObsRough = np.where(sep<rFov)[0]
             return idxObsRough
         # Or go on and use the camera footprint.
-        try:
-            self.camera
-        except AttributeError:
-            self._setupCamera()
         idxObs = []
         idxObsRough = np.where(sep<self.cameraFov)[0]
         for idx in idxObsRough:
-            mjd_date = simdata[idx]['expMJD']
+            mjd_date = simdata[idx][simdataExpMJDCol]
             mjd = ModifiedJulianDate(TAI=mjd_date)
             obs_metadata = ObservationMetaData(pointingRA=np.degrees(simdata[idx][simdataRaCol]),
                                                pointingDec=np.degrees(simdata[idx][simdataDecCol]),
                                                rotSkyPos=np.degrees(simdata[idx]['rotSkyPos']),
                                                mjd=mjd)
-            raObj = np.array([interpfuncs['ra'](simdata[idx]['expMJD'])])
-            decObj = np.array([interpfuncs['dec'](simdata[idx]['expMJD'])])
+            raObj = np.array([interpfuncs['ra'](simdata[idx][simdataExpMJDCol])])
+            decObj = np.array([interpfuncs['dec'](simdata[idx][simdataExpMJDCol])])
             # Catch the warnings from astropy about the time being in the future.
             with warnings.catch_warnings(record=False):
                 warnings.simplefilter('ignore')
-                chipNames = chipNameFromRaDec(ra=raObj,dec=decObj, epoch=self.epoch,
-                                              camera=self.camera, obs_metadata=obs_metadata)
+                chipNames = chipNameFromRaDecLSST(ra=raObj,dec=decObj, epoch=self.epoch,
+                                                  obs_metadata=obs_metadata)
             if chipNames != [None]:
                 idxObs.append(idx)
         idxObs = np.array(idxObs)
         return idxObs
 
 
-    def _calcColors(self, sedname='C.dat'):
+    def _calcColors(self, sedname='C.dat', sedDir=None):
         """
         Calculate the colors for a moving object with sed 'sedname'.
         """
@@ -137,15 +129,18 @@ class LinearObs(Orbits):
         try:
             self.lsst
         except AttributeError:
-            filterdir = os.getenv('LSST_THROUGHPUTS_BASELINE')
+            envvar = 'LSST_THROUGHPUTS_BASELINE'
+            filterdir = os.getenv(envvar)
+            if filterdir is None:
+                raise RuntimeError('Cannot find directory for throughput curves. Set env var %s' % (envvar))
             self.filterlist = ('u', 'g', 'r', 'i', 'z', 'y')
             self.lsst ={}
             for f in self.filterlist:
                 self.lsst[f] = Bandpass()
                 self.lsst[f].readThroughput(os.path.join(filterdir, 'total_'+f+'.dat'))
-            self.seddir = os.getenv('SED_DIR')
+            self.seddir = sedDir
             if self.seddir is None:
-                self.seddir = '.'
+                self.seddir = os.path.join(getPackageDir('SIMS_MOVINGOBJECTS'), 'data')
             self.vband = Bandpass()
             self.vband.readThroughput(os.path.join(self.seddir, 'harris_V.dat'))
             self.colors = {}
@@ -178,8 +173,7 @@ class LinearObs(Orbits):
         self.wroteHeader = False
 
     def writeObs(self, objId, interpfuncs, simdata, idxObs, outfileName='out.txt',
-                 sedname='C.dat', tol=1e-8,
-                 seeingCol='FWHMgeom', expTimeCol='visitExpTime'):
+                 sedname='C.dat', seeingCol='FWHMgeom', expMJDCol='expMJD', expTimeCol='visitExpTime'):
         """
         Call for each object; write out the observations of each object.
         """
@@ -192,10 +186,11 @@ class LinearObs(Orbits):
         except AttributeError:
             self._openOutput(outfileName)
         # Calculate the ephemerides for the object, using the interpfuncs, for the times in simdata[idxObs].
-        tvis = simdata['expMJD'][idxObs]
+        tvis = simdata[expMJDCol][idxObs]
         ephs = np.recarray([len(tvis)], dtype=([('delta', '<f8'), ('ra', '<f8'), ('dec', '<f8'),
-                                                ('magV', '<f8'), ('time', '<f8'), ('dradt', '<f8'), ('ddecdt', '<f8'),
-                                                ('phase', '<f8'), ('solarelon', '<f8'), ('velocity', '<f8')]))
+                                                ('magV', '<f8'), ('time', '<f8'), ('dradt', '<f8'),
+                                                ('ddecdt', '<f8'), ('phase', '<f8'), ('solarelon', '<f8'),
+                                                ('velocity', '<f8')]))
         for n in interpfuncs:
             ephs[n] = interpfuncs[n](tvis)
         ephs['time'] = tvis
@@ -243,8 +238,8 @@ class LinearObs(Orbits):
 ## Function to link the above class methods to generate an output file with moving object observations.
 def runLinearObs(orbitfile, outfileName, opsimfile,
                  dbcols=None, tstep=2./24., sqlconstraint='',
-                 rFov=np.radians(1.75), useCamera=True,
-                 obscode=807):
+                 rFov=1.75, useCamera=True,
+                 obscode=807, expMJDCol='expMJD'):
 
     from lsst.sims.maf.db import OpsimDatabase
 
@@ -257,7 +252,7 @@ def runLinearObs(orbitfile, outfileName, opsimfile,
         print("Using camera footprint")
     else:
         print("Not using camera footprint; using circular fov with %f degrees radius"
-              % (np.degrees(rFov)))
+              % (rFov))
 
     # Read opsim database.
     opsdb = OpsimDatabase(opsimfile)
@@ -266,15 +261,15 @@ def runLinearObs(orbitfile, outfileName, opsimfile,
     # Be sure the columns that we need are in place.
     #reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
     #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
-    reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+    reqcols = [expMJDCol, 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
                'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
     for col in reqcols:
         if col not in dbcols:
             dbcols.append(col)
     simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=sqlconstraint)
-    print("Queried data from opsim %s, fetched %d visits." %(opsimfile, len(simdata['expMJD'])))
+    print("Queried data from opsim %s, fetched %d visits." %(opsimfile, len(simdata[expMJDCol])))
 
-    lObs.setTimesRange(timeStep=tstep, timeStart=simdata['expMJD'].min(), timeEnd=simdata['expMJD'].max())
+    lObs.setTimesRange(timeStep=tstep, timeStart=simdata[expMJDCol].min(), timeEnd=simdata[expMJDCol].max())
     print("Will generate ephemerides on grid of %f day timesteps, then extrapolate to opsim times."
           % (tstep))
 
