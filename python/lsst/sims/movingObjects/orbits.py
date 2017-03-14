@@ -37,6 +37,8 @@ class Orbits(object):
 
     def __eq__(self, otherOrbits):
         if isinstance(otherOrbits, Orbits):
+            if self.format != otherOrbits.format:
+                return False
             for col in self.dataCols[self.format]:
                 if not self.orbits[col].equals(otherOrbits.orbits[col]):
                     return False
@@ -97,7 +99,8 @@ class Orbits(object):
             self.format = 'KEP'
         else:
             raise ValueError('Cannot determine orbital type, as neither q nor a in input orbital elements.\n'
-                             'Was attempting to base orbital element quantities on header row, with columns: \n%s' % orbits.columns)
+                             'Was attempting to base orbital element quantities on header row, '
+                             'with columns: \n%s' % orbits.columns)
         # Report a warning if formats don't seem to match.
         if (format is not None) and (format != self.format):
             warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
