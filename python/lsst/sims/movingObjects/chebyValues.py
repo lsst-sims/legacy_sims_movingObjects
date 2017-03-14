@@ -77,11 +77,14 @@ class ChebyValues(object):
         segmentIdx : int
             The index in (each of) self.coeffs for the segment.
             e.g. the first segment, for each object.
-        time : np.ndarray
+        times : np.ndarray
             The times at which to evaluate the segment.
         subsetSegments : numpy.ndarray, optional
             Optionally specify a subset of the total segment indexes.
             This lets you pick out particular objIds.
+        mask : bool, optional
+            If True, returns NaNs for values outside the range of times in the segment.
+            If False, extrapolates segment for times outside the segment time range.
 
         Returns
         -------
@@ -109,7 +112,7 @@ class ChebyValues(object):
                                             interval=tInterval, doVelocity=False, mask=mask)
         return ephemeris
 
-    def getEphemerides(self, time, objIds=None, extrapolate=False):
+    def getEphemerides(self, times, objIds=None, extrapolate=False):
         """Find the ephemeris information for 'objIds' at 'time'.
 
         Implicit in how this is currently written is that the segments are all expected to cover the
@@ -118,7 +121,7 @@ class ChebyValues(object):
 
         Parameters
         ----------
-        time : float or np.ndarray
+        times : float or np.ndarray
             The time to calculate ephemeris positions.
         objIds : numpy.ndarray, optional
             The object ids for which to generate ephemerides. If None, then just uses all objects.
@@ -132,9 +135,9 @@ class ChebyValues(object):
             The ephemeris positions for all objects.
             Note that these may not be sorted in the same order as objIds.
         """
-        if isinstance(time, float) or isinstance(time, int):
-            time = np.array([time], float)
-        ntimes = len(time)
+        if isinstance(times, float) or isinstance(times, int):
+            times = np.array([times], float)
+        ntimes = len(times)
         ephemerides = {}
         # Find subset of segments which match objId, if specified.
         if objIds is None:
@@ -146,10 +149,10 @@ class ChebyValues(object):
             objMatch = np.in1d(self.coeffs['objId'], objIds)
             ephemerides['objId'] = objIds
         # Now find ephemeris values.
-        ephemerides['time'] = np.zeros((len(ephemerides['objId']), ntimes), float) + time
+        ephemerides['time'] = np.zeros((len(ephemerides['objId']), ntimes), float) + times
         for k in self.ephemerisKeys:
             ephemerides[k] = np.zeros((len(ephemerides['objId']), ntimes), float)
-        for it, t in enumerate(time):
+        for it, t in enumerate(times):
             # Find subset of segments which contain the appropriate time.
             # Look for simplest subset first.
             segments = np.where((self.coeffs['tStart'][objMatch] <= t) &
