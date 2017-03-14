@@ -32,7 +32,7 @@ class LsstObs(object):
             self.epoch = 2000.0
             self.cameraFov = np.radians(1.75)
         # Set up dictionary to store colors of various object seds.
-        self._setupFilters(filterDir=filterDir, vDir=sedDir)
+        self.setupFilters(filterDir=filterDir, vDir=sedDir)
         self.colors = {}
 
     def _setupCamera(self):
@@ -44,7 +44,7 @@ class LsstObs(object):
         self.epoch = 2000.0
         self.cameraFov=np.radians(2.1)
 
-    def _setupFilters(self, filterDir=None, vDir=None,
+    def setupFilters(self, filterDir=None, vDir=None,
                       filterlist=('u', 'g', 'r', 'i', 'z', 'y')):
         """
         Read LSST and Harris (V) filters.
@@ -78,7 +78,7 @@ class LsstObs(object):
         self.vband = Bandpass()
         self.vband.readThroughput(os.path.join(vDir, 'harris_V.dat'))
 
-    def _calcColors(self, sedname='C.dat'):
+    def calcColors(self, sedname='C.dat'):
         """
         Calculate the colors for a given SED, store the result.
 
@@ -98,7 +98,7 @@ class LsstObs(object):
                 self.colors[sedname][f] = moSed.calcMag(self.lsst[f]) - vmag
         return
 
-    def _calcMagLosses(self, velocity, seeing, texp=30.):
+    def calcMagLosses(self, velocity, seeing, texp=30.):
         """
         Calculate the magnitude losses due to trailing and not matching the point-source detection filter.
         """
@@ -111,7 +111,7 @@ class LsstObs(object):
         dmagDetect = 1.25 * np.log10(1 + a_det*x**2 / (1+b_det*x))
         return dmagTrail, dmagDetect
 
-    def readOpsim(self, opsimfile, sqlconstraint=None, dbcols=None):
+    def readOpsim(self, opsimfile, constraint=None, dbcols=None):
         # Read opsim database.
         opsdb = OpsimDatabase(opsimfile)
         if dbcols is None:
@@ -124,7 +124,7 @@ class LsstObs(object):
         for col in reqcols:
             if col not in dbcols:
                 dbcols.append(col)
-        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=sqlconstraint)
+        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
         print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata['expMJD'])),
               file=self.logfile)
         return simdata
