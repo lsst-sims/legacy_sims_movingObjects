@@ -65,6 +65,8 @@ class LinearObs(Orbits):
 
     def generateEphs(self, sso):
         """Generate ephemerides for all times in self.ephTimes.
+
+        This sets up the grid of ephemerides to linearly interpolate between.
         """
         self.ephems.setOrbits(sso)
         oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
@@ -73,8 +75,7 @@ class LinearObs(Orbits):
 
     # Linear interpolation
     def interpolateEphs(self, ephs, i=0):
-        """
-        Generate linear interpolations between the quantities in ephs over time.
+        """Generate linear interpolations between the quantities in ephs over time.
         """
         interpfuncs = {}
         for n in ephs.dtype.names:
