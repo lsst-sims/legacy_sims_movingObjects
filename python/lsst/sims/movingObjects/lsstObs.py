@@ -116,10 +116,43 @@ class LsstObs(object):
               file=self.logfile)
         return simdata
 
+    def ssoInFov(self, ephems, simdata, rFov=1.75,
+                 useCamera=True,
+                 simdataRaCol = 'fieldRA', simdataDecCol='fieldDec', simdataExpMJDCol='expMJD'):
+        """
+        Return the indexes of the observations where the object was inside the fov.
+        """
+        # See if the object is within 'rFov' of the center of the boresight.
+        sep = angularSeparation(ephems['ra'], ephems['dec'],
+                                np.degrees(simdata[simdataRaCol]), np.degrees(simdata[simdataDecCol]))
+        if not useCamera:
+            idxObsRough = np.where(sep<rFov)[0]
+            return idxObsRough
+        # Or go on and use the camera footprint.
+        idxObs = []
+        idxObsRough = np.where(sep<self.cameraFov)[0]
+        for idx in idxObsRough:
+            mjd_date = simdata[idx][simdataExpMJDCol]
+            mjd = ModifiedJulianDate(TAI=mjd_date)
+            obs_metadata = ObservationMetaData(pointingRA=np.degrees(simdata[idx][simdataRaCol]),
+                                               pointingDec=np.degrees(simdata[idx][simdataDecCol]),
+                                               rotSkyPos=np.degrees(simdata[idx]['rotSkyPos']),
+                                               mjd=mjd)
+            raObj = ephems['ra'][idx]
+            decObj = ephems['dec'][idx]
+            # Catch the warnings from astropy about the time being in the future.
+            with warnings.catch_warnings(record=False):
+                warnings.simplefilter('ignore')
+                chipNames = chipNameFromRaDecLSST(ra=raObj,dec=decObj, epoch=self.epoch,
+                                                  obs_metadata=obs_metadata)
+            if chipNames != [None]:
+                idxObs.append(idx)
+        idxObs = np.array(idxObs)
+        return idxObs
+
     def _openOutput(self, outfileName):
         self.outfile = open(outfileName, 'w')
         self.wroteHeader = False
-
 
     #REWRITE
     def writeObs(self, objId, interpfuncs, simdata, idxObs, outfileName='out.txt',
