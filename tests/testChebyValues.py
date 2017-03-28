@@ -31,7 +31,7 @@ class TestChebyValues(unittest.TestCase):
         self.pyephems = PyOrbEphemerides(os.path.join(os.getenv('OORB_DATA'), 'DE405.dat'))
         self.pyephems.setOrbits(self.orbits)
         self.tStart = self.orbits.orbits.epoch.iloc[0]
-        self.interval = 15
+        self.interval = 30
         self.nCoeffs = 14
         self.nDecimal = 13
         self.chebyFits = ChebyFits(self.orbits, self.tStart, self.interval, ngran=64,
@@ -87,28 +87,28 @@ class TestChebyValues(unittest.TestCase):
     def testGetEphemerides(self):
         # Test that getEphemerides works and is accurate.
         chebyValues = ChebyValues()
-        # chebyValues.setCoefficients(self.chebyFits)
         chebyValues.readCoefficients(self.coeffFile)
-        # Single time, halfway through interval.
-        time = self.tStart + self.interval / 2.0
+        # Multiple times, all objects, all within interval.
+        tstep = self.interval/10.0
+        time = np.arange(self.tStart, self.tStart + self.interval, tstep)
         # Test for a single time, but all the objects.
         ephemerides = chebyValues.getEphemerides(time)
         pyephemerides = self.pyephems.generateEphemerides(time, obscode=807,
-                                                          timeScale='TAI', byObject=False)
+                                                          timeScale='TAI', byObject=True)
         # RA and Dec should agree to 2.5mas (skyTolerance above)
-        pos_residuals = np.sqrt((ephemerides['ra'][:,0] - pyephemerides['ra'][0]) ** 2 +
-                                ((ephemerides['dec'][:,0] - pyephemerides['dec']) *
-                                 np.cos(np.radians(ephemerides['dec'][:,0]))) ** 2)
+        pos_residuals = np.sqrt((ephemerides['ra'] - pyephemerides['ra']) ** 2 +
+                                ((ephemerides['dec'] - pyephemerides['dec']) *
+                                 np.cos(np.radians(ephemerides['dec']))) ** 2)
         pos_residuals *= 3600.0 * 1000.0
         # Let's just look at the max residuals in all quantities.
         for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
-            resids = np.abs(ephemerides[k][:,0] - pyephemerides[k][0])
+            resids = np.abs(ephemerides[k] - pyephemerides[k])
             if k != 'delta':
                 resids *= 3600.0 * 1000.0
             print('max diff', k, np.max(resids))
-        resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'][0])
+        resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'])
         print('max diff elongation', np.max(resids))
-        resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'][0])
+        resids = np.abs(ephemerides['vmag'] - pyephemerides['magV'])
         print('max diff vmag', np.max(resids))
         self.assertLessEqual(np.max(pos_residuals), 2.5)
         # Test for single time, but for a subset of the objects.
@@ -116,7 +116,7 @@ class TestChebyValues(unittest.TestCase):
         ephemerides = chebyValues.getEphemerides(time, objIds)
         self.assertEqual(len(ephemerides['ra']), 3)
         # Test for time outside of segment range.
-        ephemerides = chebyValues.getEphemerides(time + self.interval * 2, objIds, extrapolate=False)
+        ephemerides = chebyValues.getEphemerides(self.tStart + self.interval * 2, objIds, extrapolate=False)
         self.assertTrue(np.isnan(ephemerides['ra'][0]),
                         msg='Expected Nan for out of range ephemeris, got %.2e' %(ephemerides['ra'][0]))
 
@@ -131,7 +131,6 @@ class TestJPLValues(unittest.TestCase):
         self.orbits = Orbits()
         self.jplDir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/jpl_testdata')
         self.orbits.readOrbits(os.path.join(self.jplDir, 'S0_n747.des'), skiprows=1)
-        #self.orbits.readOrbits(os.path.join(self.jplDir, 'tmp.des'), skiprows=1)
         # Read JPL ephems.
         self.jpl = pd.read_table(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)
         # Add times in TAI and UTC, because.
@@ -154,7 +153,6 @@ class TestJPLValues(unittest.TestCase):
         self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
         self.chebyValues = ChebyValues()
         self.chebyValues.readCoefficients(self.coeffFile)
-        # self.chebyValues.setCoefficients(self.chebyFits)
 
     def tearDown(self):
         del self.orbits
