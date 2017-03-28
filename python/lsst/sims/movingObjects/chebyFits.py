@@ -207,7 +207,7 @@ class ChebyFits(object):
         # Make length an integer value within the time interval, to last decimal place accuracy.
         counter = 0
         prev_int_factor = 0
-        numTolerance = 10. ** (-1 * self.nDecimal)
+        numTolerance = 10. ** (-1 * (self.nDecimal - 1))
         while ((self.tSpan % length) > numTolerance) and (length > 0) and (counter < 20):
             int_factor = int(self.tSpan / length) + 1  # round up / ceiling
             if int_factor == prev_int_factor:
