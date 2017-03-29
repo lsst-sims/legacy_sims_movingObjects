@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import division, print_function
 import os
 
 import lsst.sims.photUtils.Bandpass as Bandpass
@@ -12,22 +12,51 @@ from lsst.utils import getPackageDir
 
 from lsst.sims.maf.db import OpsimDatabase
 
+from .orbits import Orbits
+from .ephemerides import PyOrbEphemerides
+
 __all__ = ['LsstObs']
 
 class LsstObs(object):
     """
     Class to generate actual LSST observations of a set of moving objects.
     Currently uses ChebyShev polynomials fit, should allow simple linear interpolation too.
+    Inherits from Orbits to read orbits.
     """
-    def __init__(self, logfile='obslog', cameraFootprint=True):
-        self.logfile = open(logfile, 'w')
-        # Set up camera object (used for footprint).
-        self.epoch = 2000.0
-        if cameraFootprint:
-            self.fov = 2.1
+    def __init__(self, interp, colors=None):
+        interpTypes = {'linear', 'chebyshev', 'direct'}
+        if interp not in interpTypes:
+            raise ValueError('interp method must be one of %s' % (list(interTypes.keys())))
+        self.interp = interp
+        if colors is None:
+            self.colors = {}
         else:
-            self.fov = 1.75
-        self.colors = {}
+            if isinstance(colors, dict):
+                self.colors = colors
+            else:
+                raise ValueError('Expected colors to be a dictionary of SEDname/color value (or None).')
+
+    def readOrbits(self, orbitFile, delim=None, skiprows=None):
+        self.orbits = Orbits()
+        self.orbits.readOrbits(orbitfile=orbitFile, delim=delim, skiprows=skiprows)
+
+    def readOpsim(self, opsimfile, constraint=None, dbcols=None, expMJDCol='expMJD'):
+        # Read opsim database.
+        opsdb = OpsimDatabase(opsimfile)
+        if dbcols is None:
+            dbcols = []
+        # Be sure the minimum columns that we need are in place.
+        # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+        #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
+        reqcols = [expMJDCol, 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
+                   'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
+        for col in reqcols:
+            if col not in dbcols:
+                dbcols.append(col)
+        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
+        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata[expMJDCol])),
+              file=self.logfile)
+        return simdata
 
     def setupFilters(self, filterDir=None, vDir=None,
                       filterlist=('u', 'g', 'r', 'i', 'z', 'y')):
@@ -94,43 +123,53 @@ class LsstObs(object):
         a_det = 0.42
         b_det = 0.00
         x = velocity * texp / seeing / 24.0
-        dmagTrail = 1.25 * np.log10(1 + a_trail*x**2/(1+b_trail*x))
+        dmagTrail = 1.25 * np.log10(1 + a_trail*x**2/ (1+b_trail*x))
         dmagDetect = 1.25 * np.log10(1 + a_det*x**2 / (1+b_det*x))
         return dmagTrail, dmagDetect
 
-    def readOpsim(self, opsimfile, constraint=None, dbcols=None, expMJDCol='expMJD'):
-        # Read opsim database.
-        opsdb = OpsimDatabase(opsimfile)
-        if dbcols is None:
-            dbcols = []
-        # Be sure the minimum columns that we need are in place.
-        # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-        #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
-        reqcols = [expMJDCol, 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-                   'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
-        for col in reqcols:
-            if col not in dbcols:
-                dbcols.append(col)
-        simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
-        print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata[expMJDCol])),
-              file=self.logfile)
-        return simdata
+    def setupEphem(self, ephfile=None, timescale='TAI', obscode=807):
+        """Instantiate a PyOrbEphemerides object to use to generate ephemerides.
 
-    def ssoInFov(self, ephems, simdata, rFov=1.75,
-                 useCamera=True,
-                 simdataRaCol = 'fieldRA', simdataDecCol='fieldDec', simdataExpMJDCol='expMJD'):
+        Parameters
+        ----------
+        ephfile : str, opt
+            The planetary ephemeris data file to use. Default set by PyOrbEphemerides default.
+        timescale : str, opt
+            The timescale to use for generating ephemerides. Default TAI.
+        obscode : str or int, opt
+            The observatory code to use for generating ephemerides.
+        """
+        self.ephems = PyOrbEphemerides(ephfile=ephfile)
+        self.timescale = timescale
+        self.timescaleNum = self.ephems.timeScales[timescale]
+        self.obscode = obscode
+
+    def generateEphemerides(self, times, sso=None):
+        """Generate ephemerides.
+        This either sets up the grid of ephemerides for linear interpolation (if doing linear interpolation)
+        or generates the actual ephemerides at each time (for direct interpolation).
+        """
+        if sso is None:
+            sso = self.orbits
+        self.ephems.setOrbits(sso)
+        ephs = self.ephems.generateEphemerides(times, timeScale=self.timescale,
+                                               obscode=self.obscode, byObject=True)
+        return ephs
+
+    def ssoInFov(self, ephems, simdata, rFov=2.1, useCamera=True,
+                 simdataRaCol = 'fieldRA', simdataDecCol='fieldDec', simdataExpMJDCol='expMJD',
+                 epoch=2000.0):
         """
         Return the indexes of the observations where the object was inside the fov.
         """
         # See if the object is within 'rFov' of the center of the boresight.
         sep = angularSeparation(ephems['ra'], ephems['dec'],
                                 np.degrees(simdata[simdataRaCol]), np.degrees(simdata[simdataDecCol]))
+        idxObsRough = np.where(sep<=rFov)[0]
         if not useCamera:
-            idxObsRough = np.where(sep<rFov)[0]
             return idxObsRough
         # Or go on and use the camera footprint.
         idxObs = []
-        idxObsRough = np.where(sep<self.cameraFov)[0]
         for idx in idxObsRough:
             mjd_date = simdata[idx][simdataExpMJDCol]
             mjd = ModifiedJulianDate(TAI=mjd_date)
@@ -138,13 +177,11 @@ class LsstObs(object):
                                                pointingDec=np.degrees(simdata[idx][simdataDecCol]),
                                                rotSkyPos=np.degrees(simdata[idx]['rotSkyPos']),
                                                mjd=mjd)
-            raObj = ephems['ra'][idx]
-            decObj = ephems['dec'][idx]
             # Catch the warnings from astropy about the time being in the future.
             with warnings.catch_warnings(record=False):
                 warnings.simplefilter('ignore')
-                chipNames = chipNameFromRaDecLSST(ra=raObj,dec=decObj, epoch=self.epoch,
-                                                  obs_metadata=obs_metadata)
+                chipNames = chipNameFromRaDecLSST(ra=ephems['ra'][idx],dec=ephems['dec'][idx],
+                                                  epoch=epoch, obs_metadata=obs_metadata)
             if chipNames != [None]:
                 idxObs.append(idx)
         idxObs = np.array(idxObs)
@@ -155,7 +192,7 @@ class LsstObs(object):
         self.wroteHeader = False
 
     #REWRITE
-    def writeObs(self, objId, interpfuncs, simdata, idxObs, outfileName='out.txt',
+    def writeObs(self, objId, ephems, simdata, idxObs, outfileName='out.txt',
                  sedname='C.dat', tol=1e-8,
                  seeingCol='FWHMgeom', expTimeCol='visitExpTime'):
         """
@@ -169,20 +206,17 @@ class LsstObs(object):
             self.outfile
         except AttributeError:
             self._openOutput(outfileName)
-        # Calculate the ephemerides for the object, using the interpfuncs, for the times in simdata[idxObs].
-        tvis = simdata['expMJD'][idxObs]
-        ephs = np.recarray([len(tvis)], dtype=([('delta', '<f8'), ('ra', '<f8'), ('dec', '<f8'),
+        ephs = np.recarray([len(idxObs)], dtype=([('delta', '<f8'), ('ra', '<f8'), ('dec', '<f8'),
                                                 ('magV', '<f8'), ('time', '<f8'), ('dradt', '<f8'),
                                                 ('ddecdt', '<f8'),
                                                 ('phase', '<f8'), ('solarelon', '<f8'), ('velocity', '<f8')]))
-        for n in interpfuncs:
-            ephs[n] = interpfuncs[n](tvis)
-        ephs['time'] = tvis
+        for n in ephs.dtype.names:
+            ephs[n] = ephems[n][idxObs]
         # Calculate the extra columns we want to write out
         # (dmag due to color, trailing loss, and detection loss)
         # First calculate and match the color dmag term.
         dmagColor = np.zeros(len(idxObs), float)
-        dmagColorDict = self._calcColors(sedname)
+        dmagColorDict = self.calcColors(sedname)
         filterlist = np.unique(simdata[idxObs]['filter'])
         for f in filterlist:
             if f not in dmagColorDict:

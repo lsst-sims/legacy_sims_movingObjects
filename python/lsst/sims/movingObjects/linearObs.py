@@ -283,7 +283,3 @@ def runLinearObs(orbitfile, outfileName, opsimfile,
         lObs.writeObs(objid, interpfuncs, simdata, idxObs,
                       sedname=sedname, outfileName=outfileName)
     print("Wrote output observations to file %s" %(outfileName))
-
-# Test example:
-if __name__ == '__main__':
-    runLinearObs('pha20141031.des', 'test_allObs.txt', 'enigma_1189_sqlite.db', sqlconstraint='night<365')

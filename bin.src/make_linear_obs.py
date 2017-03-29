@@ -31,7 +31,7 @@ if __name__ == '__main__':
     if args.obsFile is None:
         obsFile = os.path.join(args.outDir, '%s__%s_obs.txt' % (opsimRun, orbitbase))
     else:
-        obsFile = args.obsFile
+        obsFile = os.path.join(args.outDir, args.obsFile)
 
     runLinearObs(args.orbitFile, obsFile, args.opsimDb, tstep=args.tStep, useCamera=True,
                  sqlconstraint=args.sqlConstraint)
