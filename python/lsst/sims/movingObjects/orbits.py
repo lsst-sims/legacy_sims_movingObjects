@@ -86,7 +86,6 @@ class Orbits(object):
         # Error if orbits is empty (this avoids hard-to-interpret error messages from pyoorb).
         if nSso == 0:
             raise ValueError('Length of the orbits dataframe was 0.')
-            return
 
         # Discover which type of orbital parameters we have on disk.
         format = None
@@ -192,11 +191,45 @@ class Orbits(object):
         skiprows : int, optional
             The number of rows to skip before reading the header information for pandas.
         """
-        # Read the data from disk.
-        if delim is None:
-            orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=skiprows)
+        names = None
+        if skiprows is None:
+            skiprows = 0
+            # Figure out whether the header is in the first line, or if there are rows to skip.
+            # We need to do a bit of juggling to do this before pandas reads the whole orbit file though.
+            file = open(orbitfile, 'r')
+            for line in file:
+                values = line.split()
+                try:
+                    # If it is a valid orbit line, we expect 3 to be eccentricity.
+                    float(values[3])
+                    # And if it worked, we're done here.
+                    break
+                except (ValueError, IndexError):
+                    # This wasn't a valid number or there wasn't anything in the third value
+                    skiprows += 1
+                    valuesheader = values
+            skiprows -= 1
+            file.close()
+
+        if skiprows == -1:
+            # No header; assume it's a typical DES file.
+            names = ('objId', 'FORMAT', 'q', 'e', 'i', 'node', 'argperi', 't_p',
+                     'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
+            orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=0,
+                                   names=names)
+
         else:
-            orbits = pd.read_table(orbitfile, sep=delim, skiprows=skiprows)
+            # There is a header, but we also need to check if there is a comment key at the start
+            # of the proper header line.
+            linestart = valuesheader[0]
+            if linestart == '#' or linestart == '!!' or linestart == '##':
+                names = valuesheader[1:]
+                skiprows += 1
+            # Read the data from disk.
+            if delim is None:
+                orbits = pd.read_table(orbitfile, delim_whitespace=True, names=names, skiprows=skiprows)
+            else:
+                orbits = pd.read_table(orbitfile, sep=delim, names=names, skiprows=skiprows)
 
         # Drop some columns that are typically present in DES files but that we don't need.
         if 'INDEX' in orbits:
@@ -207,6 +240,8 @@ class Orbits(object):
             del orbits['MOID']
         if 'COMPCODE' in orbits:
             del orbits['COMPCODE']
+        if 'tmp' in orbits:
+            del orbits['tmp']
 
         # Normalize the column names to standard values and identify the orbital element types.
         ssoCols = orbits.columns.values.tolist()
@@ -215,8 +250,8 @@ class Orbits(object):
         # (depending on file version, origin, etc.)
         # that might need remapping from the on-file values to our standardized values.
         altNames = {}
-        altNames['objId'] = ['objId', 'objid', '!!ObjID', '!!OID', '!!S3MID',
-                             'objid(int)', 'full_name', '# name']
+        altNames['objId'] = ['objId', 'objid', '!!ObjID', '!!OID', '!!S3MID', 'OID', 'S3MID'
+                             'objid(int)', 'full_name', '#name']
         altNames['q'] = ['q']
         altNames['a'] = ['a']
         altNames['e'] = ['e', 'ecc']

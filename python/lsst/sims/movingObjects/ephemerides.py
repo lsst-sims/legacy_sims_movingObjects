@@ -155,15 +155,15 @@ class PyOrbEphemerides(object):
                             dtype='double', order='F')
         return ephTimes
 
-    def _generateOorbEphs(self, ephTimes, obscode=807):
+    def _generateOorbEphs(self, ephTimes, obscode='I11'):
         """Generate ephemerides using OOrb.
 
         Parameters
         ----------
         ephtimes : numpy.ndarray
             Ephemeris times in oorb format (see self.convertTimes)
-        obscode : int, optional
-            The observatory code for ephemeris generation. Default=807 (Cerro Tololo).
+        obscode : int or str, optional
+            The observatory code for ephemeris generation. Default=I11 (Cerro Pachon).
 
         Returns
         -------
@@ -211,7 +211,7 @@ class PyOrbEphemerides(object):
 
         Returns
         -------
-        numpy.ndarray
+        numpy.recarray
             The re-arranged ephemeris values, in a 3-d array.
         """
         ephs = np.swapaxes(oorbEphs, 2, 0)
@@ -226,7 +226,7 @@ class PyOrbEphemerides(object):
                                         'ddecdt', 'phase', 'solarelon', 'velocity'])
         return ephs
 
-    def generateEphemerides(self, times, timeScale='UTC', obscode=807, byObject=True,
+    def generateEphemerides(self, times, timeScale='UTC', obscode='I11', byObject=True,
                             verbose=False):
         """Calculate ephemerides for all orbits at times `times`.
 
@@ -287,8 +287,8 @@ class PyOrbEphemerides(object):
         PyOrbEphemerides
             New PyOrbEphemerides object, containing updated orbital elements for orbits specified by 'sso'.
         """
-        newEpoch = self._convertTimes([newEpoch], timeScale='TT')
-        newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElems, in_epoch=newEpoch)
+        newEpoch = self._convertTimes(newEpoch, timeScale='TT')
+        newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElem, in_epoch=newEpoch)
         if err != 0:
             warnings.warn('Orbit propagation returned error %d' % err)
         # Convert new orbital elements to normal form, and return new Orbits instance.
