@@ -23,14 +23,11 @@ if __name__ == '__main__':
 
     if not os.path.isfile(args.orbitFile):
         print("Could not find orbit file %s" % (args.orbitFile))
-    if args.orbitFile.lower().endswith('s3m'):
-        skiprows = 1
-    else:
-        skiprows = 0
+
 
     # Read orbits. This adds SEDs with the default setup automatically.
     orbits = Orbits()
-    orbits.readOrbits(args.orbitFile, skiprows=skiprows)
+    orbits.readOrbits(args.orbitFile)
 
     # An alternative method to assign the seds:
     # sedfilenames = orbits.assignSed(orbits.orbits, randomSeed=None)
