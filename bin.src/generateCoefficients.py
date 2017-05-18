@@ -52,10 +52,6 @@ if __name__ == '__main__':
 
     if not os.path.isfile(args.orbitFile):
         print("Could not find orbit file %s" % (args.orbitFile))
-    if args.orbitFile.lower().endswith('s3m'):
-        skiprows = 1
-    else:
-        skiprows = 0
 
     # Check that basic information about tSpan or tEnd is available.
     if args.tEnd is None and args.tSpan is None:
@@ -64,7 +60,7 @@ if __name__ == '__main__':
 
     # Read orbits.
     orbits = Orbits()
-    orbits.readOrbits(args.orbitFile, skiprows=skiprows)
+    orbits.readOrbits(args.orbitFile)
 
     # Pull out only objStart to objEnd, if either of these is specified.
     if args.objStart is not None or args.objEnd is not None:
