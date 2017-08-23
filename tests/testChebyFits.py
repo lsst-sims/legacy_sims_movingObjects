@@ -131,7 +131,9 @@ class TestRun(unittest.TestCase):
         interval = 30
         cheb = ChebyFits(self.orbits, tStart, interval, ngran=64, skyTolerance=2.5, nDecimal=10)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
-        cheb.calcSegmentLength(length=10.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            cheb.calcSegmentLength(length=10.0)
         # Run through segments.
         cheb.calcSegments()
         self.assertEqual(len(np.unique(cheb.coeffs['objId'])), len(self.orbits))
