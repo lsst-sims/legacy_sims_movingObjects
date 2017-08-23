@@ -4,6 +4,8 @@ import os
 import numpy as np
 import pandas as pd
 from astropy.time import Time
+import tempfile
+import shutil
 
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
@@ -19,13 +21,17 @@ except ImportError:
     _has_numexpr = False
 
 
+ROOT = os.path.abspath(os.path.dirname(__file__))
+
+
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
 class TestChebyValues(unittest.TestCase):
     def setUp(self):
         self.testdatadir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
-        self.coeffFile = 'test_coeffs'
-        self.residFile = 'test_resids'
-        self.failedFile = 'test_failed'
+        self.scratch_dir = tempfile.mkdtemp(dir=ROOT, prefix='TestChebyValues-')
+        self.coeffFile = os.path.join(self.scratch_dir, 'test_coeffs')
+        self.residFile = os.path.join(self.scratch_dir, 'test_resids')
+        self.failedFile = os.path.join(self.scratch_dir, 'test_failed')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdatadir, 'test_orbitsNEO.s3m'), skiprows=1)
         self.pyephems = PyOrbEphemerides(os.path.join(os.getenv('OORB_DATA'), 'DE405.dat'))
@@ -46,10 +52,8 @@ class TestChebyValues(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.chebyFits
-        os.remove(self.coeffFile)
-        os.remove(self.residFile)
-        if os.path.isfile(self.failedFile):
-            os.remove(self.failedFile)
+        if os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
 
     def testSetCoeff(self):
         # Test setting coefficients directly from chebyFits outputs.
@@ -140,9 +144,10 @@ class TestJPLValues(unittest.TestCase):
         self.jpl['mjdUTC'] = t.utc.mjd
         self.jpl = self.jpl.to_records(index=False)
         # Generate interpolation coefficients for the time period in the JPL catalog.
-        self.coeffFile = 'test_coeffs'
-        self.residFile = 'test_resids'
-        self.failedFile = 'test_failed'
+        self.scratch_dir = tempfile.mkdtemp(dir=ROOT, prefix='TestJPLValues-')
+        self.coeffFile = os.path.join(self.scratch_dir, 'test_coeffs')
+        self.residFile = os.path.join(self.scratch_dir, 'test_resids')
+        self.failedFile = os.path.join(self.scratch_dir, 'test_failed')
         tStart = self.jpl['mjdTAI'].min() - 0.2
         tEnd = self.jpl['mjdTAI'].max() + 0.2 - self.jpl['mjdTAI'].min()
         self.chebyFits = ChebyFits(self.orbits, tStart, tEnd,
@@ -159,10 +164,8 @@ class TestJPLValues(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.jpl
-        os.remove(self.coeffFile)
-        os.remove(self.residFile)
-        if os.path.isfile(self.failedFile):
-            os.remove(self.failedFile)
+        if os.path.exists(self.scratch_dir):
+            shutil.rmtree(self.scratch_dir)
 
     def testRADec(self):
         # We won't compare Vmag, because this also needs information on trailing losses.
