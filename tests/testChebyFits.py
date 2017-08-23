@@ -6,6 +6,7 @@ import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 from lsst.utils import getPackageDir
+from lsst.utils.tests import getTempFilePath
 
 
 try:
@@ -28,13 +29,6 @@ class TestChebyFits(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.cheb
-
-    @classmethod
-    def tearDownClass(cls):
-        os.remove('tmpCoeff')
-        os.remove('tmpResids')
-        if os.path.isfile('tmpFailed'):
-            os.remove('tmpFailed')
 
     def testPrecomputeMultipliers(self):
         # Precompute multipliers is done as an automatic step in __init__.
@@ -106,9 +100,12 @@ class TestChebyFits(unittest.TestCase):
         self.cheb.calcSegmentLength()
         self.cheb.generateEphemerides(self.cheb.makeAllTimes())
         self.cheb.calcSegments()
-        self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
-        self.assertTrue(os.path.isfile('tmpCoeff'))
-        self.assertTrue(os.path.isfile('tmpResids'))
+        with getTempFilePath('.txt') as coeff_name:
+            with getTempFilePath('.txt') as resid_name:
+                with getTempFilePath('.txt') as failed_name:
+                    self.cheb.write(coeff_name, resid_name, failed_name)
+                    self.assertTrue(os.path.isfile(coeff_name))
+                    self.assertTrue(os.path.isfile(resid_name))
 
 
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
