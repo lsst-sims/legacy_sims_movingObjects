@@ -114,16 +114,6 @@ class TestRun(unittest.TestCase):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
-        self.coeffFile = 'tmpCoeff'
-        self.residFile = 'tmpResid'
-        self.failedFile = 'tmpFailed'
-
-    def tearDown(self):
-        del self.orbits
-        os.remove(self.coeffFile)
-        os.remove(self.residFile)
-        if os.path.isfile(self.failedFile):
-            os.remove(self.failedFile)
 
     def testRunThrough(self):
         # Set up chebyshev fitter.
@@ -138,19 +128,22 @@ class TestRun(unittest.TestCase):
         cheb.calcSegments()
         self.assertEqual(len(np.unique(cheb.coeffs['objId'])), len(self.orbits))
         # Write outputs.
-        cheb.write(self.coeffFile, self.residFile, self.failedFile)
-        # Test that the segments for each individual object fit together start/end.
-        for k in cheb.coeffs:
-            cheb.coeffs[k] = np.array(cheb.coeffs[k])
-        for objId in np.unique(cheb.coeffs['objId']):
-            condition = (cheb.coeffs['objId'] == objId)
-            te_prev = tStart
-            for ts, te in zip(cheb.coeffs['tStart'][condition], cheb.coeffs['tEnd'][condition]):
-                # Test that the start of the current interval = the end of the previous interval.
-                self.assertEqual(te_prev, ts)
-                te_prev = te
-        # Test that the end of the last interval is equal to the end of the total interval
-        self.assertEqual(te, tStart + interval)
+        with getTempFilePath('.coeff.txt') as coeff_name:
+            with getTempFilePath('.resid.txt') as resid_name:
+                with getTempFilePath('.failed.txt') as failed_name:
+                    cheb.write(coeff_name, resid_name, failed_name)
+                    # Test that the segments for each individual object fit together start/end.
+                    for k in cheb.coeffs:
+                        cheb.coeffs[k] = np.array(cheb.coeffs[k])
+                    for objId in np.unique(cheb.coeffs['objId']):
+                        condition = (cheb.coeffs['objId'] == objId)
+                        te_prev = tStart
+                        for ts, te in zip(cheb.coeffs['tStart'][condition], cheb.coeffs['tEnd'][condition]):
+                            # Test that the start of the current interval = the end of the previous interval.
+                            self.assertEqual(te_prev, ts)
+                            te_prev = te
+                    # Test that the end of the last interval is equal to the end of the total interval
+                    self.assertEqual(te, tStart + interval)
 
 if __name__ == '__main__':
     unittest.main()
