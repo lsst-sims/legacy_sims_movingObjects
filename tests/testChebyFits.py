@@ -100,9 +100,9 @@ class TestChebyFits(unittest.TestCase):
         self.cheb.calcSegmentLength()
         self.cheb.generateEphemerides(self.cheb.makeAllTimes())
         self.cheb.calcSegments()
-        with getTempFilePath('.txt') as coeff_name:
-            with getTempFilePath('.txt') as resid_name:
-                with getTempFilePath('.txt') as failed_name:
+        with getTempFilePath('.coeff.txt') as coeff_name:
+            with getTempFilePath('.resid.txt') as resid_name:
+                with getTempFilePath('.failed.txt') as failed_name:
                     self.cheb.write(coeff_name, resid_name, failed_name)
                     self.assertTrue(os.path.isfile(coeff_name))
                     self.assertTrue(os.path.isfile(resid_name))
