@@ -6,6 +6,7 @@ import numpy as np
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 from lsst.utils import getPackageDir
+from lsst.utils.tests import getTempFilePath
 
 
 try:
@@ -28,13 +29,6 @@ class TestChebyFits(unittest.TestCase):
     def tearDown(self):
         del self.orbits
         del self.cheb
-
-    @classmethod
-    def tearDownClass(cls):
-        os.remove('tmpCoeff')
-        os.remove('tmpResids')
-        if os.path.isfile('tmpFailed'):
-            os.remove('tmpFailed')
 
     def testPrecomputeMultipliers(self):
         # Precompute multipliers is done as an automatic step in __init__.
@@ -106,9 +100,12 @@ class TestChebyFits(unittest.TestCase):
         self.cheb.calcSegmentLength()
         self.cheb.generateEphemerides(self.cheb.makeAllTimes())
         self.cheb.calcSegments()
-        self.cheb.write('tmpCoeff', 'tmpResids', 'tmpFailed')
-        self.assertTrue(os.path.isfile('tmpCoeff'))
-        self.assertTrue(os.path.isfile('tmpResids'))
+        with getTempFilePath('.coeff.txt') as coeff_name:
+            with getTempFilePath('.resid.txt') as resid_name:
+                with getTempFilePath('.failed.txt') as failed_name:
+                    self.cheb.write(coeff_name, resid_name, failed_name)
+                    self.assertTrue(os.path.isfile(coeff_name))
+                    self.assertTrue(os.path.isfile(resid_name))
 
 
 @unittest.skipIf(not _has_numexpr, "No numexpr available.")
@@ -117,16 +114,6 @@ class TestRun(unittest.TestCase):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
         self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
-        self.coeffFile = 'tmpCoeff'
-        self.residFile = 'tmpResid'
-        self.failedFile = 'tmpFailed'
-
-    def tearDown(self):
-        del self.orbits
-        os.remove(self.coeffFile)
-        os.remove(self.residFile)
-        if os.path.isfile(self.failedFile):
-            os.remove(self.failedFile)
 
     def testRunThrough(self):
         # Set up chebyshev fitter.
@@ -134,24 +121,29 @@ class TestRun(unittest.TestCase):
         interval = 30
         cheb = ChebyFits(self.orbits, tStart, interval, ngran=64, skyTolerance=2.5, nDecimal=10)
         # Set granularity. Use an value that will be too long, to trigger recursion below.
-        cheb.calcSegmentLength(length=10.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            cheb.calcSegmentLength(length=10.0)
         # Run through segments.
         cheb.calcSegments()
         self.assertEqual(len(np.unique(cheb.coeffs['objId'])), len(self.orbits))
         # Write outputs.
-        cheb.write(self.coeffFile, self.residFile, self.failedFile)
-        # Test that the segments for each individual object fit together start/end.
-        for k in cheb.coeffs:
-            cheb.coeffs[k] = np.array(cheb.coeffs[k])
-        for objId in np.unique(cheb.coeffs['objId']):
-            condition = (cheb.coeffs['objId'] == objId)
-            te_prev = tStart
-            for ts, te in zip(cheb.coeffs['tStart'][condition], cheb.coeffs['tEnd'][condition]):
-                # Test that the start of the current interval = the end of the previous interval.
-                self.assertEqual(te_prev, ts)
-                te_prev = te
-        # Test that the end of the last interval is equal to the end of the total interval
-        self.assertEqual(te, tStart + interval)
+        with getTempFilePath('.coeff.txt') as coeff_name:
+            with getTempFilePath('.resid.txt') as resid_name:
+                with getTempFilePath('.failed.txt') as failed_name:
+                    cheb.write(coeff_name, resid_name, failed_name)
+                    # Test that the segments for each individual object fit together start/end.
+                    for k in cheb.coeffs:
+                        cheb.coeffs[k] = np.array(cheb.coeffs[k])
+                    for objId in np.unique(cheb.coeffs['objId']):
+                        condition = (cheb.coeffs['objId'] == objId)
+                        te_prev = tStart
+                        for ts, te in zip(cheb.coeffs['tStart'][condition], cheb.coeffs['tEnd'][condition]):
+                            # Test that the start of the current interval = the end of the previous interval.
+                            self.assertEqual(te_prev, ts)
+                            te_prev = te
+                    # Test that the end of the last interval is equal to the end of the total interval
+                    self.assertEqual(te, tStart + interval)
 
 if __name__ == '__main__':
     unittest.main()
