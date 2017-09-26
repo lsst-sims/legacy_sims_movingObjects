@@ -192,7 +192,15 @@ class Orbits(object):
             The number of rows to skip before reading the header information for pandas.
         """
         names = None
-        if skiprows is None:
+        # Usually skiprows will be None and we should let readOrbits figure out the column headers.
+        # But if it is set, assume the user has modified the headers appropriately.
+        if skiprows is not None:
+            if delim is None:
+                orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=skiprows)
+            else:
+                orbits = pd.read_table(orbitfile, sep=delim,  skiprows=skiprows)
+
+        else:
             skiprows = 0
             # Figure out whether the header is in the first line, or if there are rows to skip.
             # We need to do a bit of juggling to do this before pandas reads the whole orbit file though.
@@ -211,25 +219,25 @@ class Orbits(object):
             skiprows -= 1
             file.close()
 
-        if skiprows == -1:
-            # No header; assume it's a typical DES file.
-            names = ('objId', 'FORMAT', 'q', 'e', 'i', 'node', 'argperi', 't_p',
-                     'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
-            orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=0,
-                                   names=names)
+            if skiprows == -1:
+                # No header; assume it's a typical DES file.
+                names = ('objId', 'FORMAT', 'q', 'e', 'i', 'node', 'argperi', 't_p',
+                         'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
+                orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=0,
+                                       names=names)
 
-        else:
-            # There is a header, but we also need to check if there is a comment key at the start
-            # of the proper header line.
-            linestart = valuesheader[0]
-            if linestart == '#' or linestart == '!!' or linestart == '##':
-                names = valuesheader[1:]
-                skiprows += 1
-            # Read the data from disk.
-            if delim is None:
-                orbits = pd.read_table(orbitfile, delim_whitespace=True, names=names, skiprows=skiprows)
             else:
-                orbits = pd.read_table(orbitfile, sep=delim, names=names, skiprows=skiprows)
+                # There is a header, but we also need to check if there is a comment key at the start
+                # of the proper header line.
+                linestart = valuesheader[0]
+                if linestart == '#' or linestart == '!!' or linestart == '##':
+                    names = valuesheader[1:]
+                    skiprows += 1
+                # Read the data from disk.
+                if delim is None:
+                    orbits = pd.read_table(orbitfile, delim_whitespace=True, names=names, skiprows=skiprows)
+                else:
+                    orbits = pd.read_table(orbitfile, sep=delim, names=names, skiprows=skiprows)
 
         # Drop some columns that are typically present in DES files but that we don't need.
         if 'INDEX' in orbits:
