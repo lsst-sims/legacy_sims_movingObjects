@@ -156,7 +156,7 @@ class PyOrbEphemerides(object):
         return ephTimes
 
     def _generateOorbEphs(self, ephTimes, obscode='I11'):
-        """Generate ephemerides using OOrb.
+        """Generate ephemerides using OOrb (n-body).
 
         Parameters
         ----------
@@ -172,6 +172,27 @@ class PyOrbEphemerides(object):
         """
         oorbEphems, err = oo.pyoorb.oorb_ephemeris(in_orbits=self.oorbElem, in_obscode=obscode,
                                                    in_date_ephems=ephTimes)
+        if err != 0:
+            warnings.warn('Oorb returned error %s' % (err))
+        return oorbEphems
+
+    def _generateOorbEphs2body(self, ephTimes, obscode='I11'):
+        """Generate ephemerides using OOrb with two body mode.
+
+        Parameters
+        ----------
+        ephtimes : numpy.ndarray
+            Ephemeris times in oorb format (see self.convertTimes).
+        obscode : int or str, optional
+            The observatory code for ephemeris generation. Default=I11 (Cerro Pachon).
+
+        Returns
+        -------
+        numpy.ndarray
+            The oorb-formatted ephemeris array.
+        """
+        oorbEphems, err = oo.pyoorb.oorb_ephemeris_2b(in_orbits=self.oorbElem, in_obscode=obscode,
+                                                      in_date_ephems=ephTimes)
         if err != 0:
             warnings.warn('Oorb returned error %s' % (err))
         return oorbEphems

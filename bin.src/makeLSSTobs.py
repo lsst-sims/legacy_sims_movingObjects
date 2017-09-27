@@ -12,6 +12,7 @@ from lsst.sims.movingObjects import DirectObs
 from lsst.sims.movingObjects import fixObsData
 
 from lsst.sims.maf.db import OpsimDatabase
+# from lsst.sims.maf.batches import ColMap
 
 
 def readOpsim(opsimfile, constraint=None, dbcols=None, degreesIn=False):
@@ -24,6 +25,11 @@ def readOpsim(opsimfile, constraint=None, dbcols=None, degreesIn=False):
     #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
     reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
                'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
+    degreesIn = False
+    reqcols = ['observationStartMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos',
+               'filter', 'visitExposureTime', 'seeingFwhmEff', 'seeingFwhmGeom',
+               'fiveSigmaDepth', 'solarElong']
+    degreesIn = True
     for col in reqcols:
         if col not in dbcols:
             dbcols.append(col)
@@ -49,8 +55,9 @@ def setupColors(obs, filterlist):
         obs.calcColors(sedname)
     return obs
 
-def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep):
-    obs = LinearObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI')
+def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep, ephMode):
+    obs = LinearObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI',
+                    ephMode=ephMode)
     # Set orbits.
     obs.setOrbits(orbits)
     # Set up filters
@@ -60,8 +67,9 @@ def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep)
     obs.run(opsimdata, obsFile, tstep=tstep)
     print("Wrote output observations to file %s using linear interpolation." % (obsFile))
 
-def directObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode):
-    obs = DirectObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI')
+def directObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, ephMode):
+    obs = DirectObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI',
+                    ephMode=ephMode)
     # Set orbits.
     obs.setOrbits(orbits)
     # Set up filters
@@ -98,6 +106,8 @@ if __name__ == '__main__':
     parser.add_argument("--tStep", type=float, default=2./24.0,
                         help="Timestep between ephemeris generation / linear interpolation steps (in days)."
                              " Relevant for linear interpolation only! Default 2 hours.")
+    parser.add_argument("--ephMode", type=str, default='2body',
+                        help="2body or nbody mode for ephemeris generation. Default is 2body.")
     args = parser.parse_args()
 
 
@@ -129,7 +139,8 @@ if __name__ == '__main__':
         cameraFootprint = LsstCameraFootprint()
 
     if args.interpolation == 'linear':
-        linearObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode, args.tStep)
+        linearObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode,
+                  args.tStep, args.ephMode)
 
     if args.interpolation == 'direct':
-        directObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode)
+        directObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode, args.ephMode)

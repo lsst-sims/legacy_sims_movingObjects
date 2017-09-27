@@ -13,11 +13,9 @@ __all__ = ['fixObsData', 'BaseObs']
 
 
 # These are the values for seeing and time expected in other parts of this code.
-stdTimeCol = 'expMJD'
-stdSeeingCol = 'FWHMgeom'
 
 
-def fixObsData(simData, degreesIn=False, timeCol='expMJD', seeingCol='FWHMgeom'):
+def fixObsData(simData, degreesIn=False, timeCol='observationStartMJD', seeingCol='seeingFWHMgeom'):
     """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM values.
 
     Parameters
@@ -34,10 +32,6 @@ def fixObsData(simData, degreesIn=False, timeCol='expMJD', seeingCol='FWHMgeom')
     # Create description of new recarray.
     newdtype = simData.dtype.descr
     newdtype += ([('ra', '<f8'), ('dec', '<f8')])
-    if timeCol != stdTimeCol:
-        newdtype += ([(stdTimeCol, '<f8')])
-    if seeingCol != stdSeeingCol:
-        newdtype += ([(stdSeeingCol, '<f8')])
     obsData =  np.empty(simData.shape, dtype=newdtype)
     # Add references to old data.
     for col in simData.dtype.names:
@@ -49,10 +43,6 @@ def fixObsData(simData, degreesIn=False, timeCol='expMJD', seeingCol='FWHMgeom')
         obsData['ra'] = np.degrees(simData['fieldRA'])
         obsData['dec'] = np.degrees(simData['fieldDec'])
         obsData['rotSkyPos'] = np.degrees(simData['rotSkyPos'])
-    if timeCol != stdTimeCol:
-        obsData[stdTimeCol] = simData[timeCol]
-    if seeingCol != stdSeeingCol:
-        obsData[stdSeeingCol] = simData[seeingCol]
     return obsData
 
 
@@ -70,9 +60,14 @@ class BaseObs(object):
         Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
         Default 1.75 degrees.
     """
-    def __init__(self, cameraFootprint=None, rFov=1.75):
+    def __init__(self, cameraFootprint=None, rFov=1.75,
+                 timeCol='observationStartMJD', seeingCol='seeingFwhmGeom',
+                 visitExpTimeCol='visitExposureTime'):
         self.cameraFootprint = cameraFootprint
         self.rFov = rFov
+        self.timeCol = timeCol
+        self.seeingCol = seeingCol
+        self.visitExpTimeCol = visitExpTimeCol
         self.colors = {}
 
     def setOrbits(self, orbitObj):
@@ -213,7 +208,7 @@ class BaseObs(object):
         self.wroteHeader = False
 
     def writeObs(self, objId, objEphs, obsData, outfileName='out.txt',
-                 sedname='C.dat', expTimeCol='visitExpTime'):
+                 sedname='C.dat'):
         """
         Call for each object; write out the observations of each object.
         """
@@ -239,7 +234,8 @@ class BaseObs(object):
         magFilter = objEphs['magV'] + dmagColor
         # Calculate trailing and detection loses.
         dmagTrail, dmagDetect = self.calcTrailingLosses(objEphs['velocity'],
-                                                        obsData[stdSeeingCol], obsData[expTimeCol])
+                                                        obsData[self.seeingCol],
+                                                        obsData[self.visitExpTimeCol])
         # Turn into a recarray so it's easier below.
         dmags = np.rec.fromarrays([magFilter, dmagColor, dmagTrail, dmagDetect],
                                   names=['magFilter', 'dmagColor', 'dmagTrail', 'dmagDetect'])

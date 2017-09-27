@@ -10,13 +10,12 @@ from lsst.sims.coordUtils import chipNameFromRaDecLSST
 
 __all__ = ['LsstCameraFootprint']
 
-stdTimeCol = 'expMJD'
 
 class LsstCameraFootprint(object):
     """
     Class to provide the capability for identifying observations within an LSST camera footprint.
     """
-    def inCameraFov(self, ephems, obsData, epoch=2000.0):
+    def inCameraFov(self, ephems, obsData, epoch=2000.0, timeCol='observationStartMJD'):
         """Determine which observations are within the actual camera footprint for a series of observations.
 
         Parameters
@@ -41,7 +40,7 @@ class LsstCameraFootprint(object):
         # Or go on and use the camera footprint.
         idxObs = []
         for idx in idxObsRough:
-            mjd_date = obsData[idx][stdTimeCol]
+            mjd_date = obsData[idx][timeCol]
             mjd = ModifiedJulianDate(TAI=mjd_date)
             obs_metadata = ObservationMetaData(pointingRA=obsData[idx]['ra'],
                                                pointingDec=obsData[idx]['dec'],

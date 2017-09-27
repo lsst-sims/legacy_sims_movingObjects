@@ -1,20 +1,18 @@
 from __future__ import print_function, division
-import numpy as np
 
 from .chebyValues import ChebyValues
 from .baseObs import BaseObs
 
 __all__ = ['ChebyObs']
 
-stdTimeCol = 'expMJD'
 
 class ChebyObs(BaseObs):
     """
     Class to generate observations of a set of moving objects.
     Uses linear interpolation between gridpoint of ephemerides.
     """
-    def __init__(self, cameraFootprint=None, rFov=1.75):
-        super(ChebyObs, self).__init__(cameraFootprint, rFov)
+    def __init__(self, cameraFootprint=None, rFov=1.75, **kwargs):
+        super(ChebyObs, self).__init__(cameraFootprint, rFov, **kwargs)
         self.chebval = ChebyValues
 
     # Set cheby fits coefficients for object.
@@ -24,7 +22,7 @@ class ChebyObs(BaseObs):
     def generateEphs(self, sso, obsData):
         """Generate ephemerides for all times object possibly visible in obsData.
         """
-        times = obsData[stdTimeCol]
+        times = obsData[self.timeCol]
         ephs = self.chebval.getEphemerides(times, extrapolate=True)
         return ephs
 
@@ -43,7 +41,7 @@ class ChebyObs(BaseObs):
             if self.cameraFootprint is None:
                 idxObs = self.ssoInCircleFov(ephs, obsData, rFov=self.rFov)
             else:
-                idxObs = self.cameraFootprint.inCameraFov(ephs, obsData, epoch)
+                idxObs = self.cameraFootprint.inCameraFov(ephs, obsData, epoch, self.timeCol)
             obsdat = obsData[idxObs]
             ephs = self.generateEphs(sso, obsdat)
             self.writeObs(objid, ephs, obsdat, sedname=sedname, outfileName=outfileName)

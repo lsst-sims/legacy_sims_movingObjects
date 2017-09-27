@@ -8,20 +8,23 @@ from .baseObs import BaseObs
 
 __all__ = ['LinearObs']
 
-stdTimeCol = 'expMJD'
 
 class LinearObs(BaseObs):
     """
     Class to generate observations of a set of moving objects.
     Uses linear interpolation between gridpoint of ephemerides.
+    Ephemerides can be generated using 2-body or n-body integration.
     """
     def __init__(self, cameraFootprint=None, rFov=1.75,
-                 ephfile=None, timescale='TAI', obscode='I11'):
-        super(LinearObs, self).__init__(cameraFootprint, rFov)
+                 ephfile=None, timescale='TAI', obscode='I11', ephMode='2body', **kwargs):
+        super(LinearObs, self).__init__(cameraFootprint, rFov, **kwargs)
         self.ephems = PyOrbEphemerides(ephfile=ephfile)
         self.timescale = timescale
         self.timescaleNum = self.ephems.timeScales[timescale]
         self.obscode = obscode
+        if ephMode.lower() not in ('2body', 'nbody'):
+            raise ValueError('Ephemeris generation must be 2body or nbody.')
+        self.ephMode = ephMode
 
     # Setup for linear interpolation.
     def setTimesRange(self, timeStep=1., timeStart=59580., timeEnd=63230.):
@@ -38,7 +41,7 @@ class LinearObs(BaseObs):
         times = np.arange(timeStart, timeEnd + timeStep/2.0, timeStep)
         # For pyoorb, we need to tag times with timescales;
         # 1= MJD_UTC, 2=UT1, 3=TT, 4=TAI
-        self.ephTimes = np.array(zip(times, repeat(self.timescaleNum, len(times))),
+        self.ephTimes = np.array(list(zip(times, repeat(self.timescaleNum, len(times)))),
                                  dtype='double', order='F')
 
     def setTimes(self, times):
@@ -55,7 +58,10 @@ class LinearObs(BaseObs):
         This sets up the grid of ephemerides to linearly interpolate between.
         """
         self.ephems.setOrbits(sso)
-        oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
+        if self.ephMode == '2body':
+            oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
+        else:
+            oorbEphs = self.ephems._generateOorbEphs2body(self.ephTimes, obscode=self.obscode)
         ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 
@@ -124,8 +130,8 @@ class LinearObs(BaseObs):
         tstep : float
         epoch : float, opt
         """
-        self.setTimesRange(timeStep=tstep, timeStart=obsData[stdTimeCol].min(),
-                           timeEnd=obsData[stdTimeCol].max())
+        self.setTimesRange(timeStep=tstep, timeStart=obsData[self.timeCol].min(),
+                           timeEnd=obsData[self.timeCol].max())
         print('Generating ephemerides on a grid of %f day timesteps, then will extrapolate to opsim times.'
               % (tstep))
 
@@ -134,11 +140,11 @@ class LinearObs(BaseObs):
             sedname = sso.orbits['sed_filename'].iloc[0]
             ephs = self.generateEphs(sso)
             interpfuncs = self.makeInterps(ephs)
-            ephs = self.interpEphs(interpfuncs, times=obsData[stdTimeCol], columns=['ra', 'dec'])
+            ephs = self.interpEphs(interpfuncs, times=obsData[self.timeCol], columns=['ra', 'dec'])
             if self.cameraFootprint is None:
                 idxObs = self.ssoInCircleFov(ephs, obsData, rFov=self.rFov)
             else:
-                idxObs = self.cameraFootprint.inCameraFov(ephs, obsData, epoch)
+                idxObs = self.cameraFootprint.inCameraFov(ephs, obsData, epoch, self.timeCol)
             obsdat = obsData[idxObs]
-            ephs = self.interpEphs(interpfuncs, times=obsdat[stdTimeCol])
+            ephs = self.interpEphs(interpfuncs, times=obsdat[self.timeCol])
             self.writeObs(objid, ephs, obsdat, sedname=sedname, outfileName=outfileName)
