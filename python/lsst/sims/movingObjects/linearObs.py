@@ -3,7 +3,7 @@ import numpy as np
 from itertools import repeat
 from scipy import interpolate
 
-from .ephemerides import PyOrbEphemerides
+from .ooephemerides import PyOrbEphemerides
 from .baseObs import BaseObs
 
 __all__ = ['LinearObs']

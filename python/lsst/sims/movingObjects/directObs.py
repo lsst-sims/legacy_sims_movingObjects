@@ -2,7 +2,7 @@ from __future__ import print_function, division
 import numpy as np
 from itertools import repeat
 
-from .ephemerides import PyOrbEphemerides
+from .ooephemerides import PyOrbEphemerides
 from .baseObs import BaseObs
 
 __all__ = ['DirectObs']

@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 from .chebyshevUtils import chebfit, makeChebMatrix, makeChebMatrixOnlyX
 from .orbits import Orbits
-from .ephemerides import PyOrbEphemerides
+from .ooephemerides import PyOrbEphemerides
 
 __all__ = ['ChebyFits']
 
