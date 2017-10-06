@@ -43,7 +43,7 @@ class DirectObs(BaseObs):
             oorbEphs = self.ephems._generateOorbEphs2body(self.ephTimes, obscode=self.obscode)
         else:
             oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
+        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 
     def run(self, obsData, outfileName, epoch=2000.0):
@@ -61,7 +61,7 @@ class DirectObs(BaseObs):
         for sso in self.orbits:
             objid = sso.orbits['objId'].iloc[0]
             sedname = sso.orbits['sed_filename'].iloc[0]
-            ephs = self.generateEphs(sso)
+            ephs = self.generateEphs(sso)[0]
             if self.cameraFootprint is None:
                 idxObs = self.ssoInCircleFov(ephs, obsData, rFov=self.rFov)
             else:

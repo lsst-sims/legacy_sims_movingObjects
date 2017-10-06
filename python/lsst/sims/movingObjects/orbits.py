@@ -10,15 +10,17 @@ class Orbits(object):
     """
     def __init__(self):
         self.orbits = None
-        self.format = None
+        self.orb_format = None
 
         # Specify the required columns/values in the self.orbits dataframe.
-        # Which columns are required depends on self.format.
+        # Which columns are required depends on self.orb_format.
         self.dataCols = {}
         self.dataCols['COM'] = ['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
                                 'tPeri', 'epoch', 'H', 'g', 'sed_filename']
         self.dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
                                 'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
+        self.dataCols['CART'] = ['objId', 'x', 'y', 'z', 'xdot', 'ydot', 'zdot',
+                                 'epoch', 'H', 'g', 'sed_filename']
 
     def __len__(self):
         return len(self.orbits)
@@ -36,9 +38,9 @@ class Orbits(object):
 
     def __eq__(self, otherOrbits):
         if isinstance(otherOrbits, Orbits):
-            if self.format != otherOrbits.format:
+            if self.orb_format != otherOrbits.orb_format:
                 return False
-            for col in self.dataCols[self.format]:
+            for col in self.dataCols[self.orb_format]:
                 if not self.orbits[col].equals(otherOrbits.orbits[col]):
                     return False
                 else:
@@ -55,7 +57,7 @@ class Orbits(object):
     def setOrbits(self, orbits):
         """Set and validate orbital parameters contain all required values.
 
-        Sets self.orbits and self.format.
+        Sets self.orbits and self.orb_format.
         If objid is not present in orbits, a sequential series of integers will be used.
         If H is not present in orbits, a default value of 20 will be used.
         If g is not present in orbits, a default value of 0.15 will be used.
@@ -93,17 +95,19 @@ class Orbits(object):
             format = orbits['FORMAT'].iloc[0]
             del orbits['FORMAT']
         if 'q' in orbits:
-            self.format = 'COM'
+            self.orb_format = 'COM'
         elif 'a' in orbits:
-            self.format = 'KEP'
+            self.orb_format = 'KEP'
+        elif 'x' in orbits:
+            self.orb_format = 'CART'
         else:
-            raise ValueError('Cannot determine orbital type, as neither q nor a in input orbital elements.\n'
-                             'Was attempting to base orbital element quantities on header row, '
-                             'with columns: \n%s' % orbits.columns)
+            raise ValueError("Can't determine orbital type, as neither q, a or x in input orbital elements.\n"
+                             "Was attempting to base orbital element quantities on header row, "
+                             "with columns: \n%s" % orbits.columns)
         # Report a warning if formats don't seem to match.
-        if (format is not None) and (format != self.format):
+        if (format is not None) and (format != self.orb_format):
             warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
-                          "Using %s" % (format, self.format, self.format))
+                          "Using %s" % (format, self.orb_format, self.orb_format))
 
         # Check that the orbit epoch is within a 'reasonable' range, to detect possible column mismatches.
         general_epoch = orbits['epoch'].head(1).values[0]
@@ -126,10 +130,10 @@ class Orbits(object):
             orbits['sed_filename'] = self.assignSed(orbits)
 
         # Make sure we gave all the columns we need.
-        for col in self.dataCols[self.format]:
+        for col in self.dataCols[self.orb_format]:
             if col not in orbits:
                 raise ValueError('Missing required orbital element %s for orbital format type %s'
-                                 % (col, self.format))
+                                 % (col, self.orb_format))
 
         # Check to see if we have duplicates.
         if len(np.unique(orbits['objId'])) != nSso:
@@ -273,6 +277,9 @@ class Orbits(object):
         altNames['g'] = ['g', 'phaseV', 'phase', 'gV', 'phase_g', 'G']
         altNames['meanAnomaly'] = ['meanAnomaly', 'meanAnom', 'M', 'ma']
         altNames['sed_filename'] = ['sed_filename', 'sed']
+        altNames['xdot'] = ['xdot', 'xDot']
+        altNames['ydot'] = ['ydot', 'yDot']
+        altNames['zdot'] = ['zdot', 'zDot']
 
         # Update column names that match any of the alternatives above.
         for name, alternatives in altNames.items():
