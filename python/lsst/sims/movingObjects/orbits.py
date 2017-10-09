@@ -41,6 +41,8 @@ class Orbits(object):
             if self.orb_format != otherOrbits.orb_format:
                 return False
             for col in self.dataCols[self.orb_format]:
+                if col == 'objId':
+                    continue
                 if not self.orbits[col].equals(otherOrbits.orbits[col]):
                     return False
                 else:

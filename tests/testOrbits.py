@@ -119,28 +119,28 @@ class TestOrbits(unittest.TestCase):
         newOrbits = Orbits()
         newOrbits.setOrbits(suborbits)
         self.assertEqual(len(newOrbits), 1)
-        self.assertEqual(newOrbits.format, 'COM')
+        self.assertEqual(newOrbits.orb_format, 'COM')
         assert_frame_equal(newOrbits.orbits, suborbits)
         # Test that we can set the orbits using a Series.
         for i, sso in suborbits.iterrows():
             newOrbits = Orbits()
             newOrbits.setOrbits(sso)
             self.assertEqual(len(newOrbits), 1)
-            self.assertEqual(newOrbits.format, 'COM')
+            self.assertEqual(newOrbits.orb_format, 'COM')
             assert_frame_equal(newOrbits.orbits, suborbits)
         # Test that we can set the orbits using a numpy array with many objects.
         numpyorbits = orbits.orbits.to_records(index=False)
         newOrbits = Orbits()
         newOrbits.setOrbits(numpyorbits)
         self.assertEqual(len(newOrbits), len(orbits))
-        self.assertEqual(newOrbits.format, 'COM')
+        self.assertEqual(newOrbits.orb_format, 'COM')
         assert_frame_equal(newOrbits.orbits, orbits.orbits)
         # And test that this works for a single row of the numpy array.
         onenumpyorbits = numpyorbits[0]
         newOrbits = Orbits()
         newOrbits.setOrbits(onenumpyorbits)
         self.assertEqual(len(newOrbits), 1)
-        self.assertEqual(newOrbits.format, 'COM')
+        self.assertEqual(newOrbits.orb_format, 'COM')
         assert_frame_equal(newOrbits.orbits, suborbits)
         # And test that it fails appropriately when columns are not correct.
         neworbits = pd.DataFrame(orbits.orbits)

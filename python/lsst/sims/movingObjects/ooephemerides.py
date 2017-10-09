@@ -5,6 +5,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import pyoorb as oo
+from .orbits import Orbits
 
 import time
 
@@ -29,9 +30,13 @@ class PyOrbEphemerides(object):
         # Set up oorb. Call this once.
         if ephfile is None:
             ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
-        oo.pyoorb.oorb_init(ephemeris_fname=ephfile)
+        self.ephfile = ephfile
+        self._init_oorb()
         self.oorbElem = None
         self.orb_format = None
+
+    def _init_oorb(self):
+        oo.pyoorb.oorb_init(ephemeris_fname=self.ephfile)
 
     def setOrbits(self, orbitObj):
         """Set the orbits, to be used to generate ephemerides.
@@ -61,36 +66,39 @@ class PyOrbEphemerides(object):
 
         Sets self.oorbElem, the orbit parameters in an array formatted for OpenOrb.
         """
+        oorbElem = np.zeros([len(orbitDataframe), 12], dtype=np.double, order='F')
+        # Put in simple values for objid, or add method to test if any objId is a string.
+        oorbElem[:,0] = np.arange(0, len(orbitDataframe), dtype=int) + 1
         # Add the appropriate element and epoch types:
-        orbids = np.arange(0, len(orbitDataframe), 1)
-        elem_type = np.zeros(len(orbitDataframe)) + self.elemType[orb_format]
-        epoch_scale = np.zeros(len(orbitDataframe)) + self.timeScales['TT']
-        # Convert to format for pyoorb, INCLUDING converting inclination, node, argperi to RADIANS
+        oorbElem[:,7] = np.zeros(len(orbitDataframe), float) + self.elemType[orb_format]
+        oorbElem[:,9] = np.zeros(len(orbitDataframe), float) + self.timeScales['TT']
+        # Convert other elements INCLUDING converting inclination, node, argperi to RADIANS
         if orb_format == 'KEP':
-            oorbElem = np.column_stack((orbids, orbitDataframe['a'], orbitDataframe['e'],
-                                        np.radians(orbitDataframe['inc']),
-                                        np.radians(orbitDataframe['Omega']),
-                                        np.radians(orbitDataframe['argPeri']),
-                                        np.radians(orbitDataframe['meanAnomaly']),
-                                        elem_type, orbitDataframe['epoch'], epoch_scale,
-                                        orbitDataframe['H'], orbitDataframe['g']))
+            oorbElem[:, 1] = orbitDataframe['a']
+            oorbElem[:, 2] = orbitDataframe['e']
+            oorbElem[:, 3] = np.radians(orbitDataframe['inc'])
+            oorbElem[:, 4] = np.radians(orbitDataframe['Omega'])
+            oorbElem[:, 5] = np.radians(orbitDataframe['argPeri'])
+            oorbElem[:, 6] = np.radians(orbitDataframe['meanAnomaly'])
         elif orb_format == 'COM':
-            oorbElem = np.column_stack((orbids, orbitDataframe['q'], orbitDataframe['e'],
-                                        np.radians(orbitDataframe['inc']),
-                                        np.radians(orbitDataframe['Omega']),
-                                        np.radians(orbitDataframe['argPeri']),
-                                        orbitDataframe['tPeri'], elem_type,
-                                        orbitDataframe['epoch'], epoch_scale,
-                                        orbitDataframe['H'], orbitDataframe['g']))
+            oorbElem[:, 1] = orbitDataframe['q']
+            oorbElem[:, 2] = orbitDataframe['e']
+            oorbElem[:, 3] = np.radians(orbitDataframe['inc'])
+            oorbElem[:, 4] = np.radians(orbitDataframe['Omega'])
+            oorbElem[:, 5] = np.radians(orbitDataframe['argPeri'])
+            oorbElem[:, 6] = orbitDataframe['tPeri']
         elif orb_format == 'CART':
-            oorbElem = np.column_stack((orbids, orbitDataframe['x'],
-                                        orbitDataframe['y'], orbitDataframe['z'],
-                                        orbitDataframe['xdot'], selforbitObj.orbits['ydot'],
-                                        orbitDataframe['zdot'], elem_type,
-                                        orbitDataframe['epoch'], epoch_scale,
-                                        orbitDataframe['H'], orbitDataframe['g']))
+            oorbElem[:, 1] = orbitDataframe['x']
+            oorbElem[:, 2] = orbitDataframe['y']
+            oorbElem[:, 3] = orbitDataframe['z']
+            oorbElem[:, 4] = orbitDataframe['xdot']
+            oorbElem[:, 5] = orbitDataframe['ydot']
+            oorbElem[:, 6] = orbitDataframe['zdot']
         else:
             raise ValueError('Unknown orbit format %s: should be COM, KEP or CART.' % orb_format)
+        oorbElem[:,8] = orbitDataframe['epoch']
+        oorbElem[:,10] = orbitDataframe['H']
+        oorbElem[:,11] = orbitDataframe['g']
         self.oorbElem = oorbElem
         self.orb_format = orb_format
 
@@ -136,7 +144,7 @@ class PyOrbEphemerides(object):
         newOrb.setOrbits(newOrbits)
         return newOrb
 
-    def convertOrbitFormat(self, format='CART'):
+    def convertOrbitFormat(self, orb_format='CART'):
         """Convert orbital elements from the format in orbitObj into 'format'.
 
         Parameters
@@ -147,8 +155,13 @@ class PyOrbEphemerides(object):
         Returns
         -------
         """
-        oorbElem, err = oo.pyoorb.oorb_element_transformation(self.oorbElem, self.orb_format, format)
-        return oorbElem
+        oorbElem, err = oo.pyoorb.oorb_element_transformation(in_orbits=self.oorbElem,
+                                                              in_element_type=self.elemType[orb_format])
+        if err != 0:
+            raise RuntimeError('Oorb returned error %s' % (err))
+        self.oorbElem = oorbElem
+        self.orb_format = orb_format
+        return
 
     def _convertTimes(self, times, timeScale='UTC'):
         """Generate an oorb-format array of the times desired for the ephemeris generation.
@@ -191,7 +204,7 @@ class PyOrbEphemerides(object):
         oorbEphems, err = oo.pyoorb.oorb_ephemeris(in_orbits=self.oorbElem, in_obscode=obscode,
                                                    in_date_ephems=ephTimes)
         if err != 0:
-            warnings.warn('Oorb returned error %s' % (err))
+            raise RuntimeError('Oorb returned error %s' % (err))
         return oorbEphems
 
     def _generateOorbEphs2body(self, ephTimes, obscode='I11'):
@@ -212,11 +225,11 @@ class PyOrbEphemerides(object):
         oorbEphems, err = oo.pyoorb.oorb_ephemeris_2b(in_orbits=self.oorbElem, in_obscode=obscode,
                                                       in_date_ephems=ephTimes)
         if err != 0:
-            warnings.warn('Oorb returned error %s' % (err))
+            raise RuntimeError('Oorb returned error %s' % (err))
         return oorbEphems
 
     def _convertOorbEphs(self, oorbEphs, byObject=True):
-        """Converts oorb ephemeris array to pandas dataframe, with labelled columns.
+        """Converts oorb ephemeris array to pandas dataframe, with labeled columns.
 
         The oorb ephemeris array is a 3-d array organized as: (object / times / eph@time)
         [objid][time][ephemeris information @ that time] with ephemeris elements
@@ -311,15 +324,12 @@ class PyOrbEphemerides(object):
         return ephs
 
     def propagateOrbits(self, newEpoch):
-        """DOES NOT YET WORK DUE TO ERRORS IN PYOORB!!!!
-        Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
+        """Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
 
         Parameters
         ----------
         new_epoch : float
             MJD TT time for new epoch.
-        sso : pandas.Dataframe or pandas.Series or numpy.ndarray, optional
-            A single or set of rows from self.orbits. Default = None (uses all of self.orbits).
 
         Returns
         -------
@@ -327,11 +337,16 @@ class PyOrbEphemerides(object):
             New PyOrbEphemerides object, containing updated orbital elements for orbits specified by 'sso'.
         """
         newEpoch = self._convertTimes(newEpoch, timeScale='TT')
-        if self.orb_format == 'KEP':
-            raise ValueError('Pyoorb Will not work with KEP format, kernel will die.')
-        else:
-            newOorbElems, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElem, in_epoch=newEpoch)
-            if err != 0:
-                warnings.warn('Orbit propagation returned error %d' % err)
-            self.oorbElem = newOorbElems
+        old_orb_format = self.orb_format
+        # COM format seems to crash propagation, so don't use that.
+        if self.orb_format == 'COM':
+            warnings.warn('Converting to CARTESIAN format elements')
+            self.convertOrbitFormat(orb_format='CART')
+        newOorbElem, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElem, in_epoch=newEpoch)
+        if err != 0:
+            raise RuntimeError('Orbit propagation returned error %d' % err)
+        self.oorbElem = newOorbElem
+        # Convert back to old format if necessary.
+        if old_orb_format != self.orb_format:
+            self.convertOrbitFormat(orb_format=old_orb_format)
         return
