@@ -35,10 +35,6 @@ class TestPyOrbEphemerides(unittest.TestCase):
     def testSetOrbits(self):
         # Test that we can set orbits.
         self.ephems.setOrbits(self.orbits)
-        assert_frame_equal(self.ephems.orbitObj.orbits, self.orbits.orbits)
-        # Test that setting with something other than an Orbit object fails.
-        with self.assertRaises(ValueError):
-            self.ephems.setOrbits(self.orbits.orbits)
         # Test that setting with an empty orbit object fails.
         # (Avoids hard-to-interpret errors from pyoorb).
         with self.assertRaises(ValueError):
@@ -49,23 +45,22 @@ class TestPyOrbEphemerides(unittest.TestCase):
 
     def testConvertToOorbArray(self):
         # Check that orbital elements are converted.
-        self.ephems.orbitObj = self.orbits
-        self.ephems._convertToOorbElem()
+        self.ephems._convertToOorbElem(self.orbits.orbits, self.orbits.orb_format)
         self.assertEqual(len(self.ephems.oorbElem), len(self.orbits))
         self.assertEqual(self.ephems.oorbElem[0][7], 2)
         self.assertEqual(self.ephems.oorbElem[0][9], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbits.orbits['q'][0])
         # Test that we can convert KEP orbital elements too.
-        self.ephems.orbitObj = self.orbitsKEP
-        self.ephems._convertToOorbElem()
+        self.ephems._convertToOorbElem(self.orbitsKEP.orbits, self.orbitsKEP.orb_format)
         self.assertEqual(len(self.ephems.oorbElem), len(self.orbitsKEP))
         self.assertEqual(self.ephems.oorbElem[0][7], 3)
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsKEP.orbits['a'][0])
 
     def testConvertFromOorbArray(self):
-        self.ephems.orbitObj = self.orbits
-        self.ephems._convertToOorbElem()
+        self.ephems._convertToOorbElem(self.orbits.orbits, self.orbits.orb_format)
         newOrbits = self.ephems._convertFromOorbElem(self.ephems.oorbElem)
+        print(self.orbits.orb_format, self.orbits.orbits)
+        print(newOrbits.orb_format, newOrbits.orbits)
         self.assertEqual(newOrbits, self.orbits)
 
     def testConvertTimes(self):

@@ -19,3 +19,6 @@ python/lsst/sims/movingObjects/version.py
 *.fits
 *.npz
 *~
+*.ipynb
+.ipynb_checkpoints/*
+.idea/*

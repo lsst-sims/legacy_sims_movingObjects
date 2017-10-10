@@ -24,8 +24,13 @@
 
 from .version import *
 from .orbits import *
-from .ephemerides import *
+from .ooephemerides import *
+from .adamephemerides import *
 from .chebyFits import *
 from .chebyValues import *
 from .chebyshevUtils import *
+from .baseObs import *
 from .linearObs import *
+from .directObs import *
+from .chebyObs import *
+from .lsstCameraFootprint import *
