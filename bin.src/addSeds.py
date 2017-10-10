@@ -24,7 +24,6 @@ if __name__ == '__main__':
     if not os.path.isfile(args.orbitFile):
         print("Could not find orbit file %s" % (args.orbitFile))
 
-
     # Read orbits. This adds SEDs with the default setup automatically.
     orbits = Orbits()
     orbits.readOrbits(args.orbitFile)
