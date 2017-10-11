@@ -25,7 +25,6 @@
 from .version import *
 from .orbits import *
 from .ooephemerides import *
-from .adamephemerides import *
 from .chebyFits import *
 from .chebyValues import *
 from .chebyshevUtils import *
