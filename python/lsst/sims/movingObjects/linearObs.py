@@ -20,7 +20,6 @@ class LinearObs(BaseObs):
         super(LinearObs, self).__init__(cameraFootprint, rFov, **kwargs)
         self.ephems = PyOrbEphemerides(ephfile=ephfile)
         self.timescale = timescale
-        self.timescaleNum = self.ephems.timeScales[timescale]
         self.obscode = obscode
         if ephMode.lower() not in ('2body', 'nbody'):
             raise ValueError('Ephemeris generation must be 2body or nbody.')
@@ -41,16 +40,14 @@ class LinearObs(BaseObs):
         times = np.arange(timeStart, timeEnd + timeStep/2.0, timeStep)
         # For pyoorb, we need to tag times with timescales;
         # 1= MJD_UTC, 2=UT1, 3=TT, 4=TAI
-        self.ephTimes = np.array(list(zip(times, repeat(self.timescaleNum, len(times)))),
-                                 dtype='double', order='F')
+        self.ephTimes = self.ephems._convertTimes(times, timeScale=self.timescale)
 
     def setTimes(self, times):
         """
         Set an array for oorb of the ephemeris times desired, given an explicit set of times.
         @ times : numpy array of the actual times of each ephemeris position.
         """
-        self.ephTimes = np.array(zip(times, repeat(self.timescaleNum, len(times))),
-                                 dtype='double', order='F')
+        self.ephTimes = self.ephems._convertTimes(times, timeScale=self.timescale)
 
     def generateEphs(self, sso):
         """Generate ephemerides for all times in self.ephTimes.
