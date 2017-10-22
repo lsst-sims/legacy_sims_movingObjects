@@ -15,7 +15,7 @@ __all__ = ['fixObsData', 'BaseObs']
 # These are the values for seeing and time expected in other parts of this code.
 
 
-def fixObsData(simData, degreesIn=False, timeCol='observationStartMJD', seeingCol='seeingFWHMgeom'):
+def fixObsData(simData, degreesIn=False):
     """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM values.
 
     Parameters
