@@ -159,6 +159,7 @@ class PyOrbEphemerides(object):
                                                               in_element_type=self.elemType[orb_format])
         if err != 0:
             raise RuntimeError('Oorb returned error %s' % (err))
+        del self.oorbElem
         self.oorbElem = oorbElem
         self.orb_format = orb_format
         return
