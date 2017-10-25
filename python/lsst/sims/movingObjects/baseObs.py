@@ -204,6 +204,12 @@ class BaseObs(object):
 
     # Put together the output.
     def _openOutput(self, outfileName):
+        # Make sure the directory exists to write the output file into.
+        outDir = os.path.split(outfileName)[0]
+        if len(outDir) > 0:
+            if not os.path.isdir(outDir):
+                os.makedirs(outDir)
+        # Open the output file for writing.
         self.outfile = open(outfileName, 'w')
         self.wroteHeader = False
 
