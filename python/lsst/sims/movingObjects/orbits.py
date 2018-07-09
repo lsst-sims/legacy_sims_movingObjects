@@ -170,9 +170,11 @@ class Orbits(object):
             a = orbits['a']
         elif 'q' in orbits:
             a = orbits['q'] / (1 - orbits['e'])
+        elif 'x' in orbits:
+            # This definitely isn't right, but it's a placeholder to make it work for now.
+            a = np.sqrt(orbits['x']**2 + orbits['y']**2 + orbits['z']**2)
         else:
             raise ValueError('Need either a or q (plus e) in orbit data frame.')
-        sedvals = np.empty(len(orbits), dtype=str)
         if randomSeed is not None:
             np.random.seed(randomSeed)
         chance = np.random.random(len(orbits))
@@ -296,3 +298,19 @@ class Orbits(object):
         orbits.columns = ssoCols
         # Validate and assign orbits to self.
         self.setOrbits(orbits)
+
+    def updateOrbits(self, neworb):
+        """Update existing orbital parameters with new values, while leaving OrbitIds and Seds in place.
+
+        Example use: transform orbital parameters (using PyOrbEphemerides) and then replace original values.
+        Example use: propagate orbital parameters (using PyOrbEphemerides) and then replace original values.
+
+        Parameters
+        ----------
+        neworb: pandas.DataFrame
+        """
+        col_orig = ['objId', 'otype', 'model', 'sed_filename']
+        new_order = ['objId', 'otype'] + [n for n in neworb.columns] + ['model', 'sed_filename']
+        updated_orbits = neworb.join(self.orbits[col_orig])[new_order]
+        self.setOrbits(updated_orbits)
+
