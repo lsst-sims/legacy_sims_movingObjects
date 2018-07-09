@@ -56,9 +56,9 @@ class LinearObs(BaseObs):
         """
         self.ephems.setOrbits(sso)
         if self.ephMode == '2body':
-            oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
-        else:
             oorbEphs = self.ephems._generateOorbEphs2body(self.ephTimes, obscode=self.obscode)
+        else:
+            oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
         ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 

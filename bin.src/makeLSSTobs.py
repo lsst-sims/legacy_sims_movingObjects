@@ -100,15 +100,16 @@ if __name__ == '__main__':
                         " Default 1.75 degrees.")
     parser.add_argument("--interpolation", type=str, default='linear',
                         help="Type of interpolation between ephemerides to use. Options include"
-                             " linear, chebyshev, and direct (no interpolation).")
+                             " linear, chebyshev, and direct (no interpolation)."
+                             " Default is linear.")
     parser.add_argument("--obscode", type=str, default='I11',
                         help="Obscode for generating observations with linear or direct interpolation."
                              " Default is I11 (Cerro Pachon).")
     parser.add_argument("--tStep", type=float, default=2./24.0,
                         help="Timestep between ephemeris generation / linear interpolation steps (in days)."
                              " Relevant for linear interpolation only! Default 2 hours.")
-    parser.add_argument("--ephMode", type=str, default='2body',
-                        help="2body or nbody mode for ephemeris generation. Default is 2body.")
+    parser.add_argument("--ephMode", type=str, default='nbody',
+                        help="2body or nbody mode for ephemeris generation. Default is nbody.")
     args = parser.parse_args()
 
 
