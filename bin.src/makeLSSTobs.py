@@ -12,31 +12,27 @@ from lsst.sims.movingObjects import DirectObs
 from lsst.sims.movingObjects import fixObsData
 
 from lsst.sims.maf.db import OpsimDatabase
-# from lsst.sims.maf.batches import ColMap
+from lsst.sims.maf.batches import getColMap
 
 
-def readOpsim(opsimfile, constraint=None, dbcols=None, degreesIn=False):
+def readOpsim(opsimfile, constraint=None, dbcols=None):
     # Read opsim database.
     opsdb = OpsimDatabase(opsimfile)
     if dbcols is None:
         dbcols = []
-    # Be sure the minimum columns that we need are in place.
-    # reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-    #           'visitExpTime', 'finSeeing', 'fiveSigmaDepth', 'solarElong']
-    reqcols = ['expMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos', 'filter',
-               'visitExpTime', 'FWHMeff', 'FWHMgeom', 'fiveSigmaDepth', 'solarElong']
-    degreesIn = False
-    reqcols = ['observationStartMJD', 'night', 'fieldRA', 'fieldDec', 'rotSkyPos',
-               'filter', 'visitExposureTime', 'seeingFwhmEff', 'seeingFwhmGeom',
-               'fiveSigmaDepth', 'solarElong']
-    degreesIn = True
+    colmap = getColMap(opsdb)
+    reqcols = [colmap['mjd'], colmap['night'], colmap['ra'], colmap['dec'],
+               'rotSkyPos', colmap['filter'], colmap['exptime'], colmap['seeingEff'],
+               colmap['seeingGeom'], colmap['fiveSigmaDepth'], 'solarElong']
+    degreesIn = colmap['raDecDeg']
     for col in reqcols:
         if col not in dbcols:
             dbcols.append(col)
     simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
+    opsdb.close()
     print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
     simdata = fixObsData(simdata, degreesIn=degreesIn)
-    return simdata
+    return simdata, colmap
 
 def readOrbits(orbitfile):
     if not os.path.isfile(orbitfile):
@@ -55,9 +51,12 @@ def setupColors(obs, filterlist):
         obs.calcColors(sedname)
     return obs
 
-def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep, ephMode):
+def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep, ephMode, colmap):
+    colkwargs = {'timeCol': colmap['mjd'],
+                 'seeingCol': colmap['seeingGeom'],
+                 'visitExpTimeCol': colmap['exptime']}
     obs = LinearObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI',
-                    ephMode=ephMode)
+                    ephMode=ephMode, **colkwargs)
     # Set orbits.
     obs.setOrbits(orbits)
     # Set up filters
@@ -67,9 +66,12 @@ def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep,
     obs.run(opsimdata, obsFile, tstep=tstep)
     print("Wrote output observations to file %s using linear interpolation." % (obsFile))
 
-def directObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, ephMode):
+def directObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, ephMode, colmap):
+    colkwargs = {'timeCol': colmap['mjd'],
+                 'seeingCol': colmap['seeingGeom'],
+                 'visitExpTimeCol': colmap['exptime']}
     obs = DirectObs(cameraFootprint=cameraFootprint, rFov=rFov, obscode=obscode, timescale='TAI',
-                    ephMode=ephMode)
+                    ephMode=ephMode, **colkwargs)
     # Set orbits.
     obs.setOrbits(orbits)
     # Set up filters
@@ -99,15 +101,16 @@ if __name__ == '__main__':
                         " Default 1.75 degrees.")
     parser.add_argument("--interpolation", type=str, default='linear',
                         help="Type of interpolation between ephemerides to use. Options include"
-                             " linear, chebyshev, and direct (no interpolation).")
+                             " linear, chebyshev, and direct (no interpolation)."
+                             " Default is linear.")
     parser.add_argument("--obscode", type=str, default='I11',
                         help="Obscode for generating observations with linear or direct interpolation."
                              " Default is I11 (Cerro Pachon).")
     parser.add_argument("--tStep", type=float, default=2./24.0,
                         help="Timestep between ephemeris generation / linear interpolation steps (in days)."
                              " Relevant for linear interpolation only! Default 2 hours.")
-    parser.add_argument("--ephMode", type=str, default='2body',
-                        help="2body or nbody mode for ephemeris generation. Default is 2body.")
+    parser.add_argument("--ephMode", type=str, default='nbody',
+                        help="2body or nbody mode for ephemeris generation. Default is nbody.")
     args = parser.parse_args()
 
 
@@ -117,7 +120,7 @@ if __name__ == '__main__':
         exit()
 
     orbitbase = '.'.join(os.path.split(args.orbitFile)[-1].split('.')[:-1])
-    opsimRun = os.path.split(args.opsimDb)[-1].replace('_sqlite.db', '')
+    opsimRun = os.path.split(args.opsimDb)[-1].replace('_sqlite.db', '').replace('.db', '')
 
     if args.obsFile is None:
         obsFile = os.path.join(args.outDir, '%s__%s_obs.txt' % (opsimRun, orbitbase))
@@ -128,7 +131,7 @@ if __name__ == '__main__':
     orbits = readOrbits(args.orbitFile)
 
     # Read opsim data
-    opsimdata = readOpsim(args.opsimDb, constraint=args.sqlConstraint, dbcols=None, degreesIn=False)
+    opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint, dbcols=None)
 
     # Set up camera.
     if args.noCamera:
@@ -140,7 +143,8 @@ if __name__ == '__main__':
 
     if args.interpolation == 'linear':
         linearObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode,
-                  args.tStep, args.ephMode)
+                  args.tStep, args.ephMode, colmap)
 
     if args.interpolation == 'direct':
-        directObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode, args.ephMode)
+        directObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode, args.ephMode,
+                  colmap)

@@ -193,10 +193,10 @@ class TestJPLValues(unittest.TestCase):
         # This is consistent with the errors/values reported by oorb directly in testEphemerides.
         print('max JPL errors', deltaRA.max(), deltaDec.max())
         print('std of JPL errors', np.std(deltaRA), np.std(deltaDec))
-        self.assertLess(np.max(deltaRA), 18)
-        self.assertLess(np.max(deltaDec), 6)
-        self.assertLess(np.std(deltaRA), 2)
-        self.assertLess(np.std(deltaDec), 1)
+        self.assertLess(np.max(deltaRA), 25)
+        self.assertLess(np.max(deltaDec), 10)
+        self.assertLess(np.std(deltaRA), 3)
+        self.assertLess(np.std(deltaDec), 2)
 
 
 if __name__ == '__main__':

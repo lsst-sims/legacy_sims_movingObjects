@@ -6,6 +6,7 @@ import pandas as pd
 from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 from lsst.utils import getPackageDir
+import lsst.utils.tests
 
 
 try:
@@ -33,7 +34,7 @@ class TestOrbits(unittest.TestCase):
 
     def testIterationAndIndexing(self):
         orbits = Orbits()
-        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'))
         orbitsSingle = orbits[0]
         assert_frame_equal(orbitsSingle.orbits, orbits.orbits.query('index==0'))
         orbitsSingle = orbits[3]
@@ -57,7 +58,7 @@ class TestOrbits(unittest.TestCase):
         Test that we can slice a collection of orbits
         """
         orbits = Orbits()
-        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'))
         orbit_slice = orbits[2:6]
         self.assertEqual(orbit_slice[0], orbits[2])
         self.assertEqual(orbit_slice[1], orbits[3])
@@ -79,7 +80,7 @@ class TestOrbits(unittest.TestCase):
         dataframe.
         """
         orbits0 = Orbits()
-        orbits0.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'), skiprows=1)
+        orbits0.readOrbits(os.path.join(self.testdir, 'test_orbitsNEO.s3m'))
 
         orbitsSub = Orbits()
         orbitsSub.setOrbits(orbits0.orbits.query('index>1'))
@@ -171,5 +172,15 @@ class TestOrbits(unittest.TestCase):
         sedvals2 = orbits2.assignSed(orbits2.orbits, randomSeed=42)
         np.testing.assert_array_equal(sedvals, sedvals2)
 
-if __name__ == '__main__':
+
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
+
+
+def setup_module(module):
+    lsst.utils.tests.init()
+
+
+if __name__ == "__main__":
+    lsst.utils.tests.init()
     unittest.main()

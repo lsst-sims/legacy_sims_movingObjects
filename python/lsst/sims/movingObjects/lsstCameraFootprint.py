@@ -5,8 +5,10 @@ import warnings
 from lsst.sims.utils import angularSeparation
 from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
+from lsst.obs.lsstSim import LsstSimMapper
+from lsst.sims.coordUtils import lsst_camera
 from lsst.sims.coordUtils import chipNameFromRaDecLSST
-
+from lsst.afw.cameraGeom import SCIENCE, WAVEFRONT, GUIDER, FOCUS
 
 __all__ = ['LsstCameraFootprint']
 
@@ -15,6 +17,12 @@ class LsstCameraFootprint(object):
     """
     Class to provide the capability for identifying observations within an LSST camera footprint.
     """
+    def __init__(self):
+        self.camera = lsst_camera()
+        self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
+                              GUIDER: 'guider', FOCUS: 'focus'}
+
+
     def inCameraFov(self, ephems, obsData, epoch=2000.0, timeCol='observationStartMJD'):
         """Determine which observations are within the actual camera footprint for a series of observations.
 
@@ -49,9 +57,11 @@ class LsstCameraFootprint(object):
             # Catch the warnings from astropy about the time being in the future.
             with warnings.catch_warnings(record=False):
                 warnings.simplefilter('ignore')
-                chipNames = chipNameFromRaDecLSST(ra=ephems['ra'][idx],dec=ephems['dec'][idx],
+                chipName = chipNameFromRaDecLSST(ra=ephems['ra'][idx],dec=ephems['dec'][idx],
                                                   epoch=epoch, obs_metadata=obs_metadata)
-            if chipNames != [None]:
-                idxObs.append(idx)
+            if chipName != None:
+                tt = self.ccd_type_dict[self.camera[chipName].getType()]
+                if tt == 'science':
+                    idxObs.append(idx)
         idxObs = np.array(idxObs, int)
         return idxObs

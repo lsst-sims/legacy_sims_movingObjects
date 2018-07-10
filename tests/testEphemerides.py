@@ -26,6 +26,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.orbitsKEP = Orbits()
         self.orbitsKEP.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.ephems = PyOrbEphemerides()
+        self.ephems.setOrbits(self.orbits)
 
     def tearDown(self):
         del self.orbits
@@ -58,7 +59,8 @@ class TestPyOrbEphemerides(unittest.TestCase):
 
     def testConvertFromOorbArray(self):
         self.ephems._convertToOorbElem(self.orbits.orbits, self.orbits.orb_format)
-        newOrbits = self.ephems._convertFromOorbElem(self.ephems.oorbElem)
+        newOrbits = Orbits()
+        newOrbits.setOrbits(self.ephems.convertFromOorbElem())
         print(self.orbits.orb_format, self.orbits.orbits)
         print(newOrbits.orb_format, newOrbits.orbits)
         self.assertEqual(newOrbits, self.orbits)
@@ -157,12 +159,12 @@ class TestJPLValues(unittest.TestCase):
         deltaRA *= 3600. * 1000.
         deltaDec *= 3600. * 1000.
         # Much of the time we're closer than 1mas, but there are a few which hit higher values.
-        self.assertTrue(np.max(deltaRA) < 18)
-        self.assertTrue(np.max(deltaDec) < 6)
-        self.assertTrue(np.std(deltaRA) < 2)
-        self.assertTrue(np.std(deltaDec) < 1)
         print('max JPL errors', np.max(deltaRA), np.max(deltaDec))
         print('std JPL errors', np.std(deltaRA), np.std(deltaDec))
+        self.assertLess(np.max(deltaRA), 25)
+        self.assertLess(np.max(deltaDec), 10)
+        self.assertLess(np.std(deltaRA), 2)
+        self.assertLess(np.std(deltaDec), 1)
 
 
 if __name__ == '__main__':

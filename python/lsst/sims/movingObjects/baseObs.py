@@ -15,7 +15,7 @@ __all__ = ['fixObsData', 'BaseObs']
 # These are the values for seeing and time expected in other parts of this code.
 
 
-def fixObsData(simData, degreesIn=False, timeCol='observationStartMJD', seeingCol='seeingFWHMgeom'):
+def fixObsData(simData, degreesIn=False):
     """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM values.
 
     Parameters
@@ -204,6 +204,12 @@ class BaseObs(object):
 
     # Put together the output.
     def _openOutput(self, outfileName):
+        # Make sure the directory exists to write the output file into.
+        outDir = os.path.split(outfileName)[0]
+        if len(outDir) > 0:
+            if not os.path.isdir(outDir):
+                os.makedirs(outDir)
+        # Open the output file for writing.
         self.outfile = open(outfileName, 'w')
         self.wroteHeader = False
 

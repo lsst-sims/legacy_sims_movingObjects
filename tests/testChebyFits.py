@@ -7,6 +7,7 @@ from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import ChebyFits
 from lsst.utils import getPackageDir
 from lsst.utils.tests import getTempFilePath
+import lsst.utils.tests
 
 
 try:
@@ -21,7 +22,7 @@ class TestChebyFits(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
-        self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
+        self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'))
         self.cheb = ChebyFits(self.orbits, 54800, 30, ngran=64, skyTolerance=2.5,
                               nDecimal=10, nCoeff_position=14)
         self.assertEqual(self.cheb.ngran, 64)
@@ -54,7 +55,7 @@ class TestChebyFits(unittest.TestCase):
         # Now check granularity works for other orbit types (which would have other standard lengths).
         # Check for multiple orbit types.
         for orbitFile in (['test_orbitsMBA.s3m', 'test_orbitsOuter.s3m', 'test_orbitsNEO.s3m']):
-            self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
+            self.orbits.readOrbits(os.path.join(self.testdir, orbitFile))
             tStart = self.orbits.orbits['epoch'].iloc[0]
             cheb = ChebyFits(self.orbits, tStart, 30, ngran=64, nDecimal=2)
             # And that we should converge for a variety of other tolerances.
@@ -67,7 +68,7 @@ class TestChebyFits(unittest.TestCase):
                 # print('final', orbitFile, skyTolerance, pos_resid, cheb.length, ratio)
         # And check for challenging 'impactors'.
         for orbitFile in (['test_orbitsImpactors.s3m']):
-            self.orbits.readOrbits(os.path.join(self.testdir, orbitFile), skiprows=1)
+            self.orbits.readOrbits(os.path.join(self.testdir, orbitFile))
             tStart = self.orbits.orbits['epoch'].iloc[0]
             cheb = ChebyFits(self.orbits, tStart, 30, ngran=64, nDecimal=10)
             # And that we should converge for a variety of other tolerances.
@@ -113,7 +114,7 @@ class TestRun(unittest.TestCase):
     def setUp(self):
         self.testdir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/orbits_testdata')
         self.orbits = Orbits()
-        self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'), skiprows=1)
+        self.orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsMBA.s3m'))
 
     def testRunThrough(self):
         # Set up chebyshev fitter.
@@ -145,5 +146,16 @@ class TestRun(unittest.TestCase):
                     # Test that the end of the last interval is equal to the end of the total interval
                     self.assertEqual(te, tStart + interval)
 
-if __name__ == '__main__':
+
+class TestMemory(lsst.utils.tests.MemoryTestCase):
+    pass
+
+
+def setup_module(module):
+    lsst.utils.tests.init()
+
+
+if __name__ == "__main__":
+    lsst.utils.tests.init()
     unittest.main()
+

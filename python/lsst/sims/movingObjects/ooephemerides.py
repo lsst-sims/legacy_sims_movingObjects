@@ -1,7 +1,6 @@
 from __future__ import print_function
 import os
 from itertools import repeat
-import warnings
 import numpy as np
 import pandas as pd
 import pyoorb as oo
@@ -102,7 +101,7 @@ class PyOrbEphemerides(object):
         self.oorbElem = oorbElem
         self.orb_format = orb_format
 
-    def _convertFromOorbElem(self, oorbElem):
+    def convertFromOorbElem(self):
         """Translate pyoorb-style orbital element array back into dataframe.
 
         Parameters
@@ -112,21 +111,21 @@ class PyOrbEphemerides(object):
 
         Returns
         -------
-        Orbits
-            A new Orbits instance.
+        pd.DataFrame
+            A DataFrame with the appropriate subset of columns relating to orbital elements.
         """
         if self.orb_format == 'KEP':
-            newOrbits = pd.DataFrame(self.oorbElem, columns=['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
+            newOrbits = pd.DataFrame(self.oorbElem, columns=['oorbId', 'a', 'e', 'inc', 'Omega', 'argPeri',
                                                              'meanAnomaly', 'elem_type', 'epoch',
                                                              'epoch_type',
                                                              'H', 'g'])
             newOrbits['meanAnomaly'] = np.degrees(newOrbits['meanAnomaly'])
         elif self.orb_format == 'COM':
-            newOrbits = pd.DataFrame(self.oorbElem, columns=['objId', 'q', 'e', 'inc', 'Omega', 'argPeri',
+            newOrbits = pd.DataFrame(self.oorbElem, columns=['oorbId', 'q', 'e', 'inc', 'Omega', 'argPeri',
                                                              'tPeri', 'elem_type', 'epoch', 'epoch_type',
                                                              'H', 'g'])
         elif self.orb_format == 'CART':
-            newOrbits = pd.DataFrame(self.oorbElem, columns = ['objId', 'x', 'y', 'z',
+            newOrbits = pd.DataFrame(self.oorbElem, columns = ['oorbId', 'x', 'y', 'z',
                                                                'xdot', 'ydot', 'zdot', 'elem_type', 'epoch',
                                                                'epoch_type', 'H', 'g'])
         else:
@@ -139,10 +138,10 @@ class PyOrbEphemerides(object):
         # Drop columns we don't need and don't include in our standard columns.
         del newOrbits['elem_type']
         del newOrbits['epoch_type']
-        # Have to swap orbit ids back to original values in Orbits object itself.
-        newOrb = Orbits()
-        newOrb.setOrbits(newOrbits)
-        return newOrb
+        del newOrbits['oorbId']
+        # To incorporate with original Orbits object, need to swap back to original objIds
+        # as well as put back in original SEDs.
+        return newOrbits
 
     def convertOrbitFormat(self, orb_format='CART'):
         """Convert orbital elements from the format in orbitObj into 'format'.
@@ -159,6 +158,7 @@ class PyOrbEphemerides(object):
                                                               in_element_type=self.elemType[orb_format])
         if err != 0:
             raise RuntimeError('Oorb returned error %s' % (err))
+        del self.oorbElem
         self.oorbElem = oorbElem
         self.orb_format = orb_format
         return
@@ -330,23 +330,10 @@ class PyOrbEphemerides(object):
         ----------
         new_epoch : float
             MJD TT time for new epoch.
-
-        Returns
-        -------
-        PyOrbEphemerides
-            New PyOrbEphemerides object, containing updated orbital elements for orbits specified by 'sso'.
         """
         newEpoch = self._convertTimes(newEpoch, timeScale='TT')
-        old_orb_format = self.orb_format
-        # COM format seems to crash propagation, so don't use that.
-        if self.orb_format == 'COM':
-            warnings.warn('Converting to CARTESIAN format elements')
-            self.convertOrbitFormat(orb_format='CART')
         newOorbElem, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElem, in_epoch=newEpoch)
         if err != 0:
             raise RuntimeError('Orbit propagation returned error %d' % err)
         self.oorbElem = newOorbElem
-        # Convert back to old format if necessary.
-        if old_orb_format != self.orb_format:
-            self.convertOrbitFormat(orb_format=old_orb_format)
         return
