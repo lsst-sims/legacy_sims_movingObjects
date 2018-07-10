@@ -29,6 +29,7 @@ def readOpsim(opsimfile, constraint=None, dbcols=None):
         if col not in dbcols:
             dbcols.append(col)
     simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
+    opsdb.close()
     print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
     simdata = fixObsData(simdata, degreesIn=degreesIn)
     return simdata, colmap
@@ -119,7 +120,7 @@ if __name__ == '__main__':
         exit()
 
     orbitbase = '.'.join(os.path.split(args.orbitFile)[-1].split('.')[:-1])
-    opsimRun = os.path.split(args.opsimDb)[-1].replace('_sqlite.db', '')
+    opsimRun = os.path.split(args.opsimDb)[-1].replace('_sqlite.db', '').replace('.db', '')
 
     if args.obsFile is None:
         obsFile = os.path.join(args.outDir, '%s__%s_obs.txt' % (opsimRun, orbitbase))
