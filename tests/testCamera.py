@@ -5,7 +5,7 @@ import lsst.utils.tests
 from lsst.obs.lsstSim import LsstSimMapper
 from lsst.sims.coordUtils import lsst_camera
 from lsst.sims.movingObjects import LsstCameraFootprint
-
+from lsst.sims.coordUtils import clean_up_lsst_camera
 
 class TestCamera(unittest.TestCase):
     @classmethod
@@ -15,7 +15,7 @@ class TestCamera(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         del cls.camera
-        del lsst_camera._lsst_camera
+        clean_up_lsst_camera()
 
     def setUp(self):
         obj_ra = np.array([10.0, 12.1], float)
