@@ -12,8 +12,8 @@ class ChebyValues(object):
     """
     def __init__(self):
         self.coeffs = {}
-        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
-        self.ephemerisKeys = ['ra', 'dradt', 'dec', 'ddecdt', 'delta', 'vmag', 'elongation']
+        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'geo_dist', 'vmag', 'elongation']
+        self.ephemerisKeys = ['ra', 'dradt', 'dec', 'ddecdt', 'geo_dist', 'vmag', 'elongation']
 
     def setCoefficients(self, chebyFits):
         """Set coefficients using a ChebyFits object.
@@ -50,7 +50,7 @@ class ChebyValues(object):
         # The header line provides information on the number of coefficients for each parameter.
         datacols = coeffs.columns.values
         cols = {}
-        coeff_cols = ['ra', 'dec', 'delta', 'vmag', 'elongation']
+        coeff_cols = ['ra', 'dec', 'geo_dist', 'vmag', 'elongation']
         for k in coeff_cols:
             cols[k] = [x for x in datacols if x.startswith(k)]
         # Translate dataframe to dictionary of numpy arrays
@@ -107,7 +107,7 @@ class ChebyValues(object):
                                                          self.coeffs['dec'][subsetSegments][segmentIdx],
                                                          interval=tInterval, doVelocity=True, mask=mask)
         ephemeris['dradt'] = ephemeris['dradt'] * np.cos(np.radians(ephemeris['dec']))
-        for k in ('delta', 'vmag', 'elongation'):
+        for k in ('geo_dist', 'vmag', 'elongation'):
             ephemeris[k], _ = chebeval(tScaled, self.coeffs[k][subsetSegments][segmentIdx],
                                        interval=tInterval, doVelocity=False, mask=mask)
         return ephemeris

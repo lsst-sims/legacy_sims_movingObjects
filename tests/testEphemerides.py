@@ -82,7 +82,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         ephTimes = self.ephems._convertTimes(times)
         oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
         # Check that it returned the right sort of array.
-        self.assertEqual(oorbEphs.shape, (len(self.ephems.oorbElem), len(times), 10))
+        self.assertEqual(oorbEphs.shape, (len(self.ephems.oorbElem), len(times), 14))
 
     def testEphemeris(self):
         # Calculate and convert ephemerides.

@@ -92,7 +92,7 @@ class TestChebyFits(unittest.TestCase):
         self.cheb.generateEphemerides(times, verbose=False)
         self.cheb.calcSegments()
         # We expect calculated coefficients to have the following keys:
-        coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
+        coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'geo_dist', 'vmag', 'elongation']
         for k in coeffKeys:
             self.assertTrue(k in self.cheb.coeffs.keys())
         # And in this case, we had a 30 day timespan with 1 day segments

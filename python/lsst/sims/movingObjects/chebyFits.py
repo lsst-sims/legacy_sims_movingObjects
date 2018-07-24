@@ -103,7 +103,7 @@ class ChebyFits(object):
         self.skyTolerance = skyTolerance
         self.nCoeff = {}
         self.nCoeff['position'] = int(nCoeff_position)
-        self.nCoeff['delta'] = int(nCoeff_delta)
+        self.nCoeff['geo_dist'] = int(nCoeff_delta)
         self.nCoeff['vmag'] = int(nCoeff_vmag)
         self.nCoeff['elongation'] = int(nCoeff_elongation)
         self.ngran = int(ngran)
@@ -111,9 +111,9 @@ class ChebyFits(object):
         self._precomputeMultipliers()
         # Initialize attributes to save the coefficients and residuals.
         self.coeffs = {'objId': [], 'tStart': [], 'tEnd': [],
-                       'ra': [], 'dec': [], 'delta': [], 'vmag': [], 'elongation': []}
+                       'ra': [], 'dec': [], 'geo_dist': [], 'vmag': [], 'elongation': []}
         self.resids = {'objId': [], 'tStart': [], 'tEnd': [],
-                       'pos': [], 'delta': [], 'vmag': [], 'elongation': []}
+                       'pos': [], 'geo_dist': [], 'vmag': [], 'elongation': []}
         self.failed = []
 
     def _setOrbits(self, orbitsObj):
@@ -140,7 +140,7 @@ class ChebyFits(object):
         self.multipliers['position'] = makeChebMatrix(self.ngran + 1,
                                                       self.nCoeff['position'], weight=0.16)
         self.multipliers['vmag'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['vmag'])
-        self.multipliers['delta'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['delta'])
+        self.multipliers['geo_dist'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['geo_dist'])
         self.multipliers['elongation'] = makeChebMatrixOnlyX(self.ngran + 1, self.nCoeff['elongation'])
 
     def _lengthToTimestep(self, length):
@@ -359,13 +359,13 @@ class ChebyFits(object):
         Returns
         -------
         dict
-            Dictionary containing the coefficients for each of 'delta', 'vmag', 'elongation'
+            Dictionary containing the coefficients for each of 'geo_dist', 'vmag', 'elongation'
         dict
-            Dictionary containing the max residual values for each of 'delta', 'vmag', 'elongation'.
+            Dictionary containing the max residual values for each of 'geo_dist', 'vmag', 'elongation'.
         """
         coeffs = {}
         max_resids = {}
-        for key, ephValue in zip(('delta', 'vmag', 'elongation'), ('delta', 'magV', 'solarelon')):
+        for key, ephValue in zip(('geo_dist', 'vmag', 'elongation'), ('geo_dist', 'magV', 'solarelon')):
             coeffs[key], resid, rms, max_resids[key] = chebfit(ephs['time'], ephs[ephValue], dxdt=None,
                                                                xMultiplier=self.multipliers[key],
                                                                dxMultiplier=None, nPoly=self.nCoeff[key])
@@ -429,7 +429,7 @@ class ChebyFits(object):
                 self.coeffs['tEnd'].append(tSegmentEnd)
                 self.coeffs['ra'].append(coeff_ra)
                 self.coeffs['dec'].append(coeff_dec)
-                self.coeffs['delta'].append(coeffs['delta'])
+                self.coeffs['geo_dist'].append(coeffs['geo_dist'])
                 self.coeffs['vmag'].append(coeffs['vmag'])
                 self.coeffs['elongation'].append(coeffs['elongation'])
                 # Consolidate items into the tracked residual values.
@@ -437,8 +437,8 @@ class ChebyFits(object):
                 self.resids['tStart'].append(tSegmentStart)
                 self.resids['tEnd'].append(tSegmentEnd)
                 self.resids['pos'].append(max_pos_resid)
-                self.resids['delta'].append(max_resids['delta'])
-                self.resids['vmag'].append(max_resids['delta'])
+                self.resids['geo_dist'].append(max_resids['geo_dist'])
+                self.resids['vmag'].append(max_resids['geo_dist'])
                 self.resids['elongation'].append(max_resids['elongation'])
 
     def _subdivideSegment(self, orbitObj, ephs):
@@ -456,7 +456,7 @@ class ChebyFits(object):
                              skyTolerance=self.skyTolerance,
                              nCoeff_position=self.nCoeff['position'],
                              nCoeff_vmag=self.nCoeff['vmag'],
-                             nCoeff_delta=self.nCoeff['delta'],
+                             nCoeff_delta=self.nCoeff['geo_dist'],
                              nCoeff_elongation=self.nCoeff['elongation'],
                              ngran=self.ngran, ephFile=self.ephFile,
                              nDecimal=self.nDecimal)
@@ -501,13 +501,13 @@ class ChebyFits(object):
             header = 'objId tStart tEnd '
             header += ' '.join(['ra_%d' % x for x in range(self.nCoeff['position'])]) + ' '
             header += ' '.join(['dec_%d' % x for x in range(self.nCoeff['position'])]) + ' '
-            header += ' '.join(['delta_%d' % x for x in range(self.nCoeff['delta'])]) + ' '
+            header += ' '.join(['geo_dist_%d' % x for x in range(self.nCoeff['geo_dist'])]) + ' '
             header += ' '.join(['vmag_%d' % x for x in range(self.nCoeff['vmag'])]) + ' '
             header += ' '.join(['elongation_%d' % x for x in range(self.nCoeff['elongation'])])
         else:
             header = None
         if (not append) or (not os.path.isfile(residFile)):
-            resid_header = 'objId segNum tStart tEnd length pos delta vmag elong'
+            resid_header = 'objId segNum tStart tEnd length pos geo_dist vmag elong'
         else:
             resid_header = None
         timeformat = '%.' + '%s' % self.nDecimal + 'f'
@@ -517,7 +517,7 @@ class ChebyFits(object):
             for i, (objId, tStart, tEnd, cRa, cDec, cDelta, cVmag, cE) in \
                     enumerate(zip(self.coeffs['objId'], self.coeffs['tStart'],
                                   self.coeffs['tEnd'], self.coeffs['ra'],
-                                  self.coeffs['dec'], self.coeffs['delta'],
+                                  self.coeffs['dec'], self.coeffs['geo_dist'],
                                   self.coeffs['vmag'], self.coeffs['elongation'])):
                 print("%s %s %s %s %s %s %s %s" % (objId, timeformat % tStart, timeformat % tEnd,
                                                    " ".join('%.14e' % j for j in cRa),
@@ -532,7 +532,7 @@ class ChebyFits(object):
             for i, (objId, tStart, tEnd, rPos, rDelta, rVmag, rE) in \
                     enumerate(zip(self.resids['objId'], self.resids['tStart'],
                                   self.resids['tEnd'], self.resids['pos'],
-                                  self.resids['delta'], self.resids['vmag'],
+                                  self.resids['geo_dist'], self.resids['vmag'],
                                   self.resids['elongation'])):
                 print("%s %i %.14f %.14f %.14f %.14e %.14e %.14e %.14e" % (objId, i + 1,
                                                                            tStart, tEnd,

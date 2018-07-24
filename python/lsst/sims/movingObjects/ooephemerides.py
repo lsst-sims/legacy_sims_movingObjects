@@ -273,9 +273,11 @@ class PyOrbEphemerides(object):
             velocity = np.swapaxes(velocity, 1, 0)
         # Create a numpy recarray.
         ephs = np.rec.fromarrays([ephs[0], ephs[1], ephs[2], ephs[3], ephs[4],
-                                  ephs[6], ephs[7], ephs[8], ephs[9], velocity],
-                                 names=['delta', 'ra', 'dec', 'magV', 'time', 'dradt',
-                                        'ddecdt', 'phase', 'solarelon', 'velocity'])
+                                  ephs[6], ephs[7], velocity, ephs[8], ephs[9],
+                                  ephs[10], ephs[11], ephs[12], ephs[13]],
+                                 names=['geo_dist', 'ra', 'dec', 'magV', 'time',
+                                        'dradt', 'ddecdt', 'velocity', 'phase', 'solarelon',
+                                        'helio_dist', 'h_lon', 'h_lat', 'true_anomaly'])
         return ephs
 
     def generateEphemerides(self, times, timeScale='UTC', obscode='I11', byObject=True,

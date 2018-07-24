@@ -47,7 +47,7 @@ class TestChebyValues(unittest.TestCase):
         self.chebyFits.calcSegmentLength(length=self.setLength)
         self.chebyFits.calcSegments()
         self.chebyFits.write(self.coeffFile, self.residFile, self.failedFile, append=False)
-        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
+        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'geo_dist', 'vmag', 'elongation']
 
     def tearDown(self):
         del self.orbits
@@ -105,9 +105,9 @@ class TestChebyValues(unittest.TestCase):
                                  np.cos(np.radians(ephemerides['dec']))) ** 2)
         pos_residuals *= 3600.0 * 1000.0
         # Let's just look at the max residuals in all quantities.
-        for k in ('ra', 'dec', 'dradt', 'ddecdt', 'delta'):
+        for k in ('ra', 'dec', 'dradt', 'ddecdt', 'geo_dist'):
             resids = np.abs(ephemerides[k] - pyephemerides[k])
-            if k != 'delta':
+            if k != 'geo_dist':
                 resids *= 3600.0 * 1000.0
             print('max diff', k, np.max(resids))
         resids = np.abs(ephemerides['elongation'] - pyephemerides['solarelon'])
@@ -155,7 +155,7 @@ class TestJPLValues(unittest.TestCase):
         self.chebyFits.calcSegmentLength()
         self.chebyFits.calcSegments()
         self.chebyFits.write(self.coeffFile, self.residFile, self.failedFile, append=False)
-        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'delta', 'vmag', 'elongation']
+        self.coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'geo_dist', 'vmag', 'elongation']
         self.chebyValues = ChebyValues()
         self.chebyValues.readCoefficients(self.coeffFile)
 
