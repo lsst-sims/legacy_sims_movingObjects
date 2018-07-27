@@ -113,13 +113,14 @@ class Orbits(object):
 
         # Check that the orbit epoch is within a 'reasonable' range, to detect possible column mismatches.
         general_epoch = orbits['epoch'].head(1).values[0]
-        expect_min_epoch = 16000.
-        expect_max_epoch = 80000.
+        # Look for epochs between 1800 and 2200 - this is primarily to check if people used MJD (and not JD).
+        expect_min_epoch = -21503.
+        expect_max_epoch = 124594.
         if general_epoch < expect_min_epoch or general_epoch > expect_max_epoch:
             raise ValueError("The epoch detected for this orbit is odd - %f. "
-                             "Expecting a value between %.1f and %.1f" % (general_epoch,
-                                                                          expect_min_epoch,
-                                                                          expect_max_epoch))
+                             "Expecting a value between %.1f and %.1f (MJD!)" % (general_epoch,
+                                                                                 expect_min_epoch,
+                                                                                 expect_max_epoch))
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
