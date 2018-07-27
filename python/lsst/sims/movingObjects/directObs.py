@@ -9,11 +9,30 @@ __all__ = ['DirectObs']
 
 
 class DirectObs(BaseObs):
-    """
-    Class to generate observations of a set of moving objects.
+    """Generate observations of a set of Orbits, using direct ephemeris generation.
+
     Uses no interpolation to generate observations - direct ephemeris generation.
-    This is slow because it's generating ephemerides for all opsim data times, 
+    This is slow because it's generating ephemerides for all opsim data times,
     then culling observations that aren't within FOV.
+
+    Parameters
+    ----------
+    cameraFootprint : CameraFootprint, opt
+        A cameraFootprint class (which provides a way to determine if observations fall into a given
+        camera footprint), such as lsstCameraFootprint.
+        If none provided, a simple circular FOV is available from the BaseObs class.
+    rFov : float, opt
+        Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
+        Default 1.75 degrees.
+    timeCol : str, opt
+        Name of the column (in the simulated pointing history) for Time (MJD).
+        Default observationStartMJD.
+    seeingCol : str, opt
+        Name of the column (in the simulated pointing history) for the physical size of the seeing.
+        Default seeingFwhmGeom.
+    visitExpTimeCol : str, opt
+        Name of the column (in the simulated pointing history) for the visit exposure time.
+        Default visitExposureTime.
     """
     def __init__(self, cameraFootprint=None, rFov=1.75,
                  ephfile=None, timescale='TAI', obscode='I11',
@@ -28,15 +47,28 @@ class DirectObs(BaseObs):
         self.ephMode = ephMode
 
     def setTimes(self, times):
-        """
-        Set an array for oorb of the ephemeris times desired, given an explicit set of times.
-        @ times : numpy array of the actual times of each ephemeris position.
+        """Set an array for oorb of the ephemeris times desired, given an explicit set of times.
+
+        Parameters
+        ----------
+        times : numpy.ndarray
+            Array of the actual times of each ephemeris position.
         """
         self.ephTimes = np.array(list(zip(times, repeat(self.timescaleNum, len(times)))),
                                  dtype='double', order='F')
 
     def generateEphs(self, sso):
         """Generate ephemerides for all times in self.ephTimes.
+
+        Parameters
+        ----------
+        sso : lsst.sims.movingObjects.Orbits
+            The (single) object for which to generate ephemerides at times self.ephTimes.
+
+        Returns
+        -------
+        numpy.ndarray
+            The ephemeride values at all times self.ephTimes.
         """
         self.ephems.setOrbits(sso)
         if self.ephMode == '2body':
@@ -47,13 +79,25 @@ class DirectObs(BaseObs):
         return ephs
 
     def run(self, obsData, outfileName, epoch=2000.0):
-        """
-        
+        """Find and write the observations of each object to disk.
+
+        For each object, identify the observations where the object is
+        within rFOV of the pointing boresight (potentially, also in the camera footprint),
+        and write the ephemeris values and observation metadata to disk.
+        Uses direct ephemeris generation for each pointing.
+
         Parameters
         ----------
         obsData : np.recarray
+            The simulated pointing history data.
         outfileName : str
+            The output file name.
+        tstep : float, opt
+            The time between points in the ephemeris grid, in days.
+            Default 2 hours.
         epoch : float, opt
+            The epoch of the RA/Dec reference frame.
+            Default 2000.0
         """
         times = obsData[self.timeCol]
         self.setTimes(times)

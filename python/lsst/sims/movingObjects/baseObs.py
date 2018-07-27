@@ -16,7 +16,8 @@ __all__ = ['fixObsData', 'BaseObs']
 
 
 def fixObsData(simData, degreesIn=False):
-    """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM values.
+    """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM column names
+    and degree values..
 
     Parameters
     ----------
@@ -49,16 +50,25 @@ def fixObsData(simData, degreesIn=False):
 class BaseObs(object):
     """
     Base class to generate observations of a set of moving objects.
-    
+
     Parameters
     ----------
     cameraFootprint : CameraFootprint, opt
         A cameraFootprint class (which provides a way to determine if observations fall into a given
-        camera footprint), such as lsstCameraFootprint. 
+        camera footprint), such as lsstCameraFootprint.
         If none provided, a simple circular FOV is available from the BaseObs class.
     rFov : float, opt
         Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
         Default 1.75 degrees.
+    timeCol : str, opt
+        Name of the column (in the simulated pointing history) for Time (MJD).
+        Default observationStartMJD.
+    seeingCol : str, opt
+        Name of the column (in the simulated pointing history) for the physical size of the seeing.
+        Default seeingFwhmGeom.
+    visitExpTimeCol : str, opt
+        Name of the column (in the simulated pointing history) for the visit exposure time.
+        Default visitExposureTime.
     """
     def __init__(self, cameraFootprint=None, rFov=1.75,
                  timeCol='observationStartMJD', seeingCol='seeingFwhmGeom',
@@ -71,13 +81,32 @@ class BaseObs(object):
         self.colors = {}
 
     def setOrbits(self, orbitObj):
+        """Set the orbital parameters.
+
+        Parameters
+        ----------
+        orbitObj: lsst.sims.movingObjects.Orbits
+            An "Orbits" object with orbital parameter values.
+        """
         if isinstance(orbitObj, Orbits):
             self.orbits = orbitObj
         else:
             raise ValueError('Expected an lsst.sims.movingObjects.Orbit object.')
 
     def calcTrailingLosses(self, velocity, seeing, texp=30.):
-        """Calculate the detection and SNR traiiling losses.
+        """Calculate the detection and SNR trailing losses.
+
+        'Trailing' losses = loss in sensitivity due to the photons from the source being
+        spread over more pixels; thus more sky background is included when calculating the
+        flux from the object and thus the SNR is lower than for an equivalent brightness
+        stationary/PSF-like source. dmagTrail represents this loss.
+
+        'Detection' trailing losses = loss in sensitivity due to the photons from the source being
+        spread over more pixels, in a non-stellar-PSF way, while source detection is (typically) done
+        using a stellar PSF filter and 5-sigma cutoff values based on assuming peaks from stellar PSF's
+        above the background; thus the SNR is lower than for an equivalent brightness stationary/PSF-like
+        source (and by a greater factor than just the simple SNR trailing loss above).
+        dmagDetect represents this loss.
 
         Parameters
         ----------
@@ -107,9 +136,9 @@ class BaseObs(object):
                     filterlist=('u', 'g', 'r', 'i', 'z', 'y'),
                     vDir=None, vFilter='harris_V.dat'):
         """
-        Read (LSST) and Harris (V) filters. 
-        
-        Only the defaults are LSST specific; this can easily be adapted for any survey. 
+        Read (LSST) and Harris (V) filter throughput curves.
+
+        Only the defaults are LSST specific; this can easily be adapted for any survey.
 
         Parameters
         ----------
@@ -117,7 +146,7 @@ class BaseObs(object):
             Directory containing the filter throughput curves ('total_*.dat')
             Default set by 'LSST_THROUGHPUTS_BASELINE' env variable.
         bandpassRoot : str, opt
-            Rootname of the throughput curves in filterlist. 
+            Rootname of the throughput curves in filterlist.
             E.g. throughput curve names are bandpassRoot + filterlist[i] + bandpassSuffix
             Default 'total_' (appropriate for LSST throughput repo).
         bandpassSuffix : str, opt
@@ -130,7 +159,7 @@ class BaseObs(object):
             Directory containing the V band throughput curve.
             Default None = $SIMS_MOVINGOBJECTS_DIR/data.
         vFilter : str, opt
-            Name of the V band filter curve. 
+            Name of the V band filter curve.
             Default harris_V.dat.
         """
         if filterDir is None:
@@ -153,7 +182,8 @@ class BaseObs(object):
 
         If the sedname is not already in the dictionary self.colors, this reads the
         SED from disk and calculates all V-[filter] colors for all filters in self.filterlist.
-        The result is stored in self.colors[sedname][filter].
+        The result is stored in self.colors[sedname][filter], so will not be recalculated if
+        the SED + color is reused for another object.
 
         Parameters
         ----------
@@ -195,7 +225,7 @@ class BaseObs(object):
 
         Returns
         -------
-        np.ndarray
+        numpy.ndarray
             Returns the indexes of the numpy array of the object observations which are inside the fov.
         """
         sep = angularSeparation(ephems['ra'], ephems['dec'], obsData['ra'], obsData['dec'])
@@ -217,6 +247,32 @@ class BaseObs(object):
                  sedname='C.dat'):
         """
         Call for each object; write out the observations of each object.
+
+        This method is called once all of the ephemeris values for each observation are calculated;
+        the calling method should have already done the matching between ephemeris & simulated observations
+        to find the observations where the object is within the specified fov.
+        Inside this method, the trailing losses and color terms are calculated and added to the output
+        observation file.
+
+        The first time this method is called, a header will be added to the output file.
+
+        Parameters
+        ----------
+        objId : str or int or float
+            The identifier for the object (from the orbital parameters)
+        objEphs : numpy.ndarray
+            The ephemeris values of the object at each observation.
+            Note that the names of the columns are encoded in the numpy structured array,
+            and any columns included in the returned ephemeris array will also be propagated to the output.
+        obsData : numpy.ndarray
+            The observation details from the simulated pointing history, for all observations of
+            the object. All columns automatically propagated to the output file.
+        outfileName : str, opt
+            Output file name. Default 'out.txt'
+        sedname : str, out
+            The sed_filename for the object (from the orbital parameters).
+            Used to calculate the appropriate color terms for the output file.
+            Default "C.dat".
         """
         # Return if there's nothing to write out.
         if len(objEphs) == 0:
