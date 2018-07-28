@@ -143,7 +143,7 @@ class BaseObs(object):
         Parameters
         ----------
         filterDir : str, opt
-            Directory containing the filter throughput curves ('total_*.dat')
+            Directory containing the filter throughput curves ('total*.dat')
             Default set by 'LSST_THROUGHPUTS_BASELINE' env variable.
         bandpassRoot : str, opt
             Rootname of the throughput curves in filterlist.
