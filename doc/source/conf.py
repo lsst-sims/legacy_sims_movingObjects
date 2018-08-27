@@ -69,15 +69,15 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'MAF'
-copyright = u'2015, LSST Simulations Team'
+project = u'sims_movingObjects'
+copyright = u'2018, LSST Simulations Team'
 author = u'LSST Simulations Team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-from lsst.sims.maf import __version__
+from lsst.sims.movingObjects import __version__
 version = __version__
 release = __version__
 
@@ -222,7 +222,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'MAFdoc'
+htmlhelp_basename = 'sims_movingObjectsdoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -244,7 +244,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'MAF.tex', u'MAF Documentation',
+  (master_doc, 'sims_movingObjects.tex', u'sims_movingObjects Documentation',
    u'LSST Simulations Team', 'manual'),
 ]
 
@@ -274,7 +274,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'maf', u'MAF Documentation',
+    (master_doc, 'sims_movingObjects', u'sims_movingObjects Documentation',
      [author], 1)
 ]
 
@@ -288,8 +288,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'MAF', u'MAF Documentation',
-   author, 'MAF', 'One line description of project.',
+  (master_doc, 'sims_movingObjects', u'sims_movingObjects Documentation',
+   author, 'sims_movingObjects', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -308,7 +308,7 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 #intersphinx_mapping = {'https://docs.python.org/': None}
-intersphinx_mapping = {'python': ('https://docs.python.org/2.7', None)}
+intersphinx_mapping = {'python': ('https://docs.python.org/3.6', None)}
 
 # Napoleon configuration
 napoleon_google_docstring = False
