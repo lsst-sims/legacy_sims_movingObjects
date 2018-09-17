@@ -17,7 +17,22 @@ def dtime(time_prev):
 
 class PyOrbEphemerides(object):
     """Generate ephemerides and propagate orbits using the python interface to Oorb.
-    Inherits from Orbits and uses parent class to set orbital parameters.
+
+    Typical usage:
+    pyephs = PyOrbEphemerides()
+    # Set the orbital parameters, using an lsst.sims.movingObjects.Orbits object
+    pyephs.setOrbits(orbits)
+    # Generate ephemerides at times 'times'.
+    ephs = pyephs.generateEphemerides(times, timeScale='UTC', obscode='I11')
+
+    This class handles the packing and unpacking of the fortran style arrays that
+    pyoorb uses, to and from more user-friendly pandas arrays.
+
+    Parameters
+    ----------
+    ephfile : str, opt
+        Planetary ephemerides file for Oorb (i.e. de430 or de405).
+        Default $OORB_DATA/de430.dat  ($OORB_DATA = $OORB_DIR/data).
     """
     def __init__(self, ephfile=None):
         # Set translation from timescale to OpenOrb numerical representation.
@@ -28,7 +43,7 @@ class PyOrbEphemerides(object):
 
         # Set up oorb. Call this once.
         if ephfile is None:
-            ephfile = os.path.join(os.getenv('OORB_DATA'), 'de405.dat')
+            ephfile = os.path.join(os.getenv('OORB_DATA'), 'de430.dat')
         self.ephfile = ephfile
         self._init_oorb()
         self.oorbElem = None

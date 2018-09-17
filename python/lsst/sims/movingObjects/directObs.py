@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import numpy as np
-from itertools import repeat
 
 from .ooephemerides import PyOrbEphemerides
 from .baseObs import BaseObs
@@ -15,8 +14,10 @@ class DirectObs(BaseObs):
     First generates observations on a rough grid and looks for observations within a specified tolerance
     of the actual observations; for the observations which pass this cut, generates a precise ephemeris
     and checks if the object is within the FOV.
+
+
     """
-    def __init__(self, cameraFootprint=None, rFov=1.75,
+    def __init__(self, cameraFootprint=True, rFov=1.75,
                  ephfile=None, timescale='TAI', obscode='I11',
                  **kwargs):
         super().__init__(cameraFootprint, rFov, **kwargs)

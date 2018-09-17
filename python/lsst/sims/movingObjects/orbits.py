@@ -6,7 +6,12 @@ __all__ = ['Orbits']
 
 
 class Orbits(object):
-    """Orbits reads and stores orbit parameters for moving objects.
+    """Orbits reads, checks for required values, and stores orbit parameters for moving objects.
+
+    Instantiate the class and then use readOrbits or setOrbits to set the orbit values.
+
+    self.orbits stores the orbital parameters, as a pandas dataframe.
+    self.dataCols defines the columns required, although objId, H, g, and sed_filename are optional.
     """
     def __init__(self):
         self.orbits = None
@@ -196,6 +201,10 @@ class Orbits(object):
         After reading and standardizing the column names, calls selfs.setOrbits to validate the
         orbital parameters. Expects angles in orbital element formats to be in degrees.
 
+        Note that readOrbits uses pandas.read_table to read the data file with the orbital parameters.
+        Thus, it should have column headers specifying the column names _unless_ skiprows == -1,
+        in which case it is assumed to be a standard DES COMETARY format file, with no header line.
+
         Parameters
         ----------
         orbitfile : str
@@ -306,7 +315,7 @@ class Orbits(object):
         self.setOrbits(orbits)
 
     def updateOrbits(self, neworb):
-        """Update existing orbital parameters with new values, while leaving OrbitIds and Seds in place.
+        """Update existing orbits with new values, leaving OrbitIds, H, g, and sed_filenames in place.
 
         Example use: transform orbital parameters (using PyOrbEphemerides) and then replace original values.
         Example use: propagate orbital parameters (using PyOrbEphemerides) and then replace original values.
@@ -315,8 +324,8 @@ class Orbits(object):
         ----------
         neworb: pandas.DataFrame
         """
-        col_orig = ['objId', 'otype', 'model', 'sed_filename']
-        new_order = ['objId', 'otype'] + [n for n in neworb.columns] + ['model', 'sed_filename']
+        col_orig = ['objId', 'otype', 'model', 'H', 'g', 'sed_filename']
+        new_order = ['objId', 'otype'] + [n for n in neworb.columns] + ['H', 'g', 'model', 'sed_filename']
         updated_orbits = neworb.join(self.orbits[col_orig])[new_order]
         self.setOrbits(updated_orbits)
 
