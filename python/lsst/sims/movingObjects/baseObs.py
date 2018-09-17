@@ -1,4 +1,3 @@
-from __future__ import print_function, division
 import os
 import numpy as np
 
@@ -7,43 +6,19 @@ from lsst.sims.photUtils import Bandpass
 from lsst.sims.photUtils import Sed
 from lsst.sims.utils import angularSeparation
 
+from lsst.sims.utils import angularSeparation
+from lsst.sims.utils import ModifiedJulianDate
+from lsst.sims.utils import ObservationMetaData
+from lsst.sims.coordUtils import lsst_camera
+from lsst.sims.coordUtils import chipNameFromRaDecLSST
+from lsst.afw.cameraGeom import SCIENCE, WAVEFRONT, GUIDER, FOCUS
+
 from .orbits import Orbits
 
-__all__ = ['fixObsData', 'BaseObs']
+__all__ = ['BaseObs']
 
 
 # These are the values for seeing and time expected in other parts of this code.
-
-
-def fixObsData(simData, degreesIn=False):
-    """Format opsim data to expected ra/dec/time/rotSkyPos/FWHM values.
-
-    Parameters
-    ----------
-    simData : np.recarray
-        Array of data from opsim.
-    degreesIn : bool, opt
-        Is the data in simdata in degrees? Default False (opsimv3).
-
-    Returns
-    -------
-    np.recarray
-    """
-    # Create description of new recarray.
-    newdtype = simData.dtype.descr
-    newdtype += ([('ra', '<f8'), ('dec', '<f8')])
-    obsData =  np.empty(simData.shape, dtype=newdtype)
-    # Add references to old data.
-    for col in simData.dtype.names:
-        obsData[col] = simData[col]
-    if degreesIn:
-        obsData['ra'] = simData['fieldRA']
-        obsData['dec'] = simData['fieldDec']
-    else:
-        obsData['ra'] = np.degrees(simData['fieldRA'])
-        obsData['dec'] = np.degrees(simData['fieldDec'])
-        obsData['rotSkyPos'] = np.degrees(simData['rotSkyPos'])
-    return obsData
 
 
 class BaseObs(object):
@@ -52,22 +27,48 @@ class BaseObs(object):
     
     Parameters
     ----------
-    cameraFootprint : CameraFootprint, opt
-        A cameraFootprint class (which provides a way to determine if observations fall into a given
-        camera footprint), such as lsstCameraFootprint. 
-        If none provided, a simple circular FOV is available from the BaseObs class.
+    cameraFootprint : bool, opt
+        If True, then use the camera footprint exactly. If False, then only use rFov.
+        Default False (use rFov only).
     rFov : float, opt
         Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
         Default 1.75 degrees.
+    obsTimeCol: str, opt
+        Name of the time column in the obsData. Default 'observationStartMJD'.
+    obsTimeScale: str, opt
+        Type of timescale for MJD (TAI or UTC currently). Default TAI.
+    seeingCol: str, opt
+        Name of the seeing column in the obsData. Default 'seeingFwhmGeom'.
+        This should be the geometric/physical seeing as it is used for the trailing loss calculation.
+    visitExpTimeCol: str, opt
+        Name of the visit exposure time column in the obsData. Default 'visitExposureTime'.
+    obsRa: str, opt
+        Name of the RA column in the obsData. Default 'fieldRA'.
+    obsDec: str, opt
+        Name of the Dec column in the obsData. Default 'fieldDec'.
+    obsRotSkyPos: str, opt
+        Name of the Rotator column in the obsData. Default 'rotSkyPos'.
+    obsDegrees: bool, opt
+        Whether the observational data is in degrees or radians. Default True (degrees).
     """
-    def __init__(self, cameraFootprint=None, rFov=1.75,
-                 timeCol='observationStartMJD', seeingCol='seeingFwhmGeom',
-                 visitExpTimeCol='visitExposureTime'):
+    def __init__(self, cameraFootprint=False, rFov=1.75,
+                 obsTimeCol='observationStartMJD', obsTimeScale='TAI',
+                 seeingCol='seeingFwhmGeom', visitExpTimeCol='visitExposureTime',
+                 obsRA='fieldRA', obsDec='fieldDec', obsRotSkyPos='rotSkyPos', obsDegrees=True):
         self.cameraFootprint = cameraFootprint
+        if self.cameraFootprint:
+            self.camera = lsst_camera()
+            self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
+                                  GUIDER: 'guider', FOCUS: 'focus'}
         self.rFov = rFov
-        self.timeCol = timeCol
+        self.obsTimeCol = obsTimeCol
+        self.obsTimeScale = obsTimeScale
         self.seeingCol = seeingCol
         self.visitExpTimeCol = visitExpTimeCol
+        self.obsRA = obsRA
+        self.obsDec = obsDec
+        self.obsRotSkyPos = obsRotSkyPos
+        self.obsDegrees = obsDegrees
         self.colors = {}
 
     def setOrbits(self, orbitObj):
@@ -181,25 +182,80 @@ class BaseObs(object):
 
     def ssoInCircleFov(self, ephems, obsData, rFov=2.1):
         """Determine which observations are within a circular fov for a series of observations.
+        Note that ephems and obsData must be the same length.
 
         Parameters
         ----------
         ephems : np.recarray
-            Ephemerides for the objects, with RA and Dec as 'ra' and 'dec' columns (in degrees).
+            Ephemerides for the objects.
         obsData : np.recarray
-            The observation pointings, with RA and Dec as 'ra' and 'dec' columns (in degrees).
+            The observation pointings.
         rFov : float, opt
             The radius of the field of view, in degrees.
             Default 2.1 is appropriate for LSST fov if later applying camera footprint.
-            A value of 1.75 would be appropriate for simple circular LSST FOV assumption.
+            A value of 1.75 would be appropriate for a simple circular LSST FOV assumption.
 
         Returns
         -------
         np.ndarray
             Returns the indexes of the numpy array of the object observations which are inside the fov.
         """
-        sep = angularSeparation(ephems['ra'], ephems['dec'], obsData['ra'], obsData['dec'])
+        if not self.obsDegrees:
+            sep = angularSeparation(ephems['ra'], ephems['dec'],
+                                    np.degrees(obsData[self.obsRA]), np.degrees(obsData[self.obsDec]))
+        else:
+            sep = angularSeparation(ephems['ra'], ephems['dec'],
+                                    obsData[self.obsRA], obsData[self.obsDec])
         idxObs = np.where(sep <= rFov)[0]
+        return idxObs
+
+    def ssoInCameraFov(self, ephems, obsData):
+        """Determine which observations are within the actual camera footprint for a series of observations.
+        Note that ephems and obsData must be the same length.
+
+        Parameters
+        ----------
+        ephems : np.recarray
+            Ephemerides for the objects.
+        obsData : np.recarray
+            Observation pointings.
+
+        Returns
+        -------
+        np.ndarray
+            Returns the indexes of the numpy array of the object observations which are inside the fov.
+        """
+        epoch = 2000.0
+        # See if the object is within 'rFov' of the center of the boresight.
+        idxObsRough = self.ssoInCircleFov(ephems, obsData, rFov=2.1)
+        # Then test for the camera footprint exactly.
+        idxObs = []
+        for idx in idxObsRough:
+            mjd_date = obsData[idx][self.obsTimeCol]
+            if self.obsTimeScale == 'TAI':
+                mjd = ModifiedJulianDate(TAI=mjd_date)
+            elif self.obsTimeScale == 'UTC':
+                mjd = ModifiedJulianDate(UTC=mjd_date)
+            if not self.degrees:
+                obs_metadata = ObservationMetaData(pointingRA=np.degrees(obsData[idx][self.obsRA]),
+                                                   pointingDec=np.degrees(obsData[idx][self.obsDec]),
+                                                   rotSkyPos=np.degrees(obsData[idx][self.obsRotSkyPos]),
+                                                   mjd=mjd)
+            else:
+                obs_metadata = ObservationMetaData(pointingRA=obsData[idx][self.obsRA],
+                                                   pointingDec=obsData[idx][self.obsDec],
+                                                   rotSkyPos=obsData[idx][self.obsRotSkyPos],
+                                                   mjd=mjd)
+            # Catch the warnings from astropy about the time being in the future.
+            with warnings.catch_warnings(record=False):
+                warnings.simplefilter('ignore')
+                chipName = chipNameFromRaDecLSST(ra=ephems['ra'][idx], dec=ephems['dec'][idx],
+                                                 epoch=epoch, obs_metadata=obs_metadata)
+            if chipName != None:
+                tt = self.ccd_type_dict[self.camera[chipName].getType()]
+                if tt == 'science':
+                    idxObs.append(idx)
+        idxObs = np.array(idxObs, int)
         return idxObs
 
     # Put together the output.

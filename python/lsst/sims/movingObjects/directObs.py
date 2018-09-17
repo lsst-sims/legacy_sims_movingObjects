@@ -10,53 +10,45 @@ __all__ = ['DirectObs']
 
 class DirectObs(BaseObs):
     """
-    Class to generate observations of a set of moving objects.
-    Uses no interpolation to generate observations - direct ephemeris generation.
-    This is slow because it's generating ephemerides for all opsim data times, 
-    then culling observations that aren't within FOV.
+    Generate observations of a set of moving objects: exact ephemeris at the times of each observation.
+
+    First generates observations on a rough grid and looks for observations within a specified tolerance
+    of the actual observations; for the observations which pass this cut, generates a precise ephemeris
+    and checks if the object is within the FOV.
     """
     def __init__(self, cameraFootprint=None, rFov=1.75,
                  ephfile=None, timescale='TAI', obscode='I11',
-                 ephMode='nbody', **kwargs):
-        super(DirectObs, self).__init__(cameraFootprint, rFov, **kwargs)
+                 **kwargs):
+        super().__init__(cameraFootprint, rFov, **kwargs)
         self.ephems = PyOrbEphemerides(ephfile=ephfile)
         self.timescale = timescale
-        self.timescaleNum = self.ephems.timeScales[timescale]
         self.obscode = obscode
-        if ephMode.lower() not in ('2body', 'nbody'):
-            raise ValueError('Ephemeris generation must be 2body or nbody.')
-        self.ephMode = ephMode
 
-    def setTimes(self, times):
-        """
-        Set an array for oorb of the ephemeris times desired, given an explicit set of times.
-        @ times : numpy array of the actual times of each ephemeris position.
-        """
-        self.ephTimes = np.array(list(zip(times, repeat(self.timescaleNum, len(times)))),
-                                 dtype='double', order='F')
-
-    def generateEphs(self, sso):
-        """Generate ephemerides for all times in self.ephTimes.
+    def generateEphs(self, sso, times, ephMode):
+        """Generate ephemerides.
         """
         self.ephems.setOrbits(sso)
-        if self.ephMode == '2body':
-            oorbEphs = self.ephems._generateOorbEphs2body(self.ephTimes, obscode=self.obscode)
+        ephTimes = self.ephems._convertTimes(times, self.timescale)
+        if ephMode == '2body':
+            oorbEphs = self.ephems._generateOorbEphs2body(ephTimes, obscode=self.obscode)
         else:
-            oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
+            oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=self.obscode)
         ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
         return ephs
 
     def run(self, obsData, outfileName, epoch=2000.0):
-        """
+        """Generate the observations of the objects.
         
         Parameters
         ----------
         obsData : np.recarray
+            Observation data. Must contain self.timeCol (time information) and self.raCol, self.decCol.
         outfileName : str
+            Output file name.
         epoch : float, opt
+            Epoch of the RA/Dec of the observations.
         """
-        times = obsData[self.timeCol]
-        self.setTimes(times)
+        all_times = obsData[self.timeCol]
 
         for sso in self.orbits:
             objid = sso.orbits['objId'].iloc[0]

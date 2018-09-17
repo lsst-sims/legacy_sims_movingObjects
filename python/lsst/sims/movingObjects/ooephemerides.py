@@ -273,15 +273,15 @@ class PyOrbEphemerides(object):
             velocity = np.swapaxes(velocity, 1, 0)
         # Create a numpy recarray.
         ephs = np.rec.fromarrays([ephs[0], ephs[1], ephs[2], ephs[3], ephs[4],
-                                  ephs[6], ephs[7], velocity, ephs[8], ephs[9],
-                                  ephs[10], ephs[11], ephs[12], ephs[13]],
+                                  ephs[6], ephs[7], velocity, ephs[8], ephs[9]],
+        #                          ephs[10], ephs[11], ephs[12], ephs[13]],
                                  names=['geo_dist', 'ra', 'dec', 'magV', 'time',
-                                        'dradt', 'ddecdt', 'velocity', 'phase', 'solarelon',
-                                        'helio_dist', 'h_lon', 'h_lat', 'true_anomaly'])
+                                        'dradt', 'ddecdt', 'velocity', 'phase', 'solarelon'])
+        #                                'helio_dist', 'h_lon', 'h_lat', 'true_anomaly'])
         return ephs
 
     def generateEphemerides(self, times, timeScale='UTC', obscode='I11', byObject=True,
-                            verbose=False):
+                            ephMode='nbody', verbose=False):
         """Calculate ephemerides for all orbits at times `times`.
 
         This is a public method, wrapping self._convertTimes, self._generateOorbEphs
@@ -317,7 +317,12 @@ class PyOrbEphemerides(object):
         """
         t = time.time()
         ephTimes = self._convertTimes(times, timeScale=timeScale)
-        oorbEphs = self._generateOorbEphs(ephTimes, obscode=obscode)
+        if ephMode.lower() == 'nbody':
+            oorbEphs = self._generateOorbEphs(ephTimes, obscode=obscode)
+        elif ephMode.lower() == '2body':
+            oorbEphs = self._generateOorbEphs2body(ephTimes, obscode=obscode)
+        else:
+            raise ValueError('ephType must be 2body or nbody')
         ephs = self._convertOorbEphs(oorbEphs, byObject=byObject)
         dt, t = dtime(t)
         if verbose:
