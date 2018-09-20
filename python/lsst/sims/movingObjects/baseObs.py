@@ -1,11 +1,10 @@
 import os
 import numpy as np
+import warnings
 
 from lsst.utils import getPackageDir
 from lsst.sims.photUtils import Bandpass
 from lsst.sims.photUtils import Sed
-from lsst.sims.utils import angularSeparation
-
 from lsst.sims.utils import angularSeparation
 from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
@@ -13,7 +12,7 @@ from lsst.sims.coordUtils import lsst_camera
 from lsst.sims.coordUtils import chipNameFromRaDecLSST
 from lsst.afw.cameraGeom import SCIENCE, WAVEFRONT, GUIDER, FOCUS
 
-from .orbits import Orbits
+from .ooephemerides import PyOrbEphemerides
 
 __all__ = ['BaseObs']
 
@@ -24,13 +23,16 @@ class BaseObs(object):
 
     Parameters
     ----------
-<<<<<<< HEAD
     cameraFootprint : bool, opt
         If True, then use the camera footprint exactly. If False, then only use rFov.
         Default False (use rFov only).
     rFov : float, opt
         Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
         Default 1.75 degrees.
+    ephMode: str, opt
+        Mode for ephemeris generation - nbody or 2body. Default is 2body.
+    obsCode: str, opt
+        Observatory code for ephemeris generation. Default is "I11" - Cerro Pachon.
     obsTimeCol: str, opt
         Name of the time column in the obsData. Default 'observationStartMJD'.
     obsTimeScale: str, opt
@@ -50,6 +52,7 @@ class BaseObs(object):
         Whether the observational data is in degrees or radians. Default True (degrees).
     """
     def __init__(self, cameraFootprint=False, rFov=1.75,
+                 ephMode='2body', obsCode='I11',
                  obsTimeCol='observationStartMJD', obsTimeScale='TAI',
                  seeingCol='seeingFwhmGeom', visitExpTimeCol='visitExposureTime',
                  obsRA='fieldRA', obsDec='fieldDec', obsRotSkyPos='rotSkyPos', obsDegrees=True):
@@ -59,6 +62,10 @@ class BaseObs(object):
             self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
                                   GUIDER: 'guider', FOCUS: 'focus'}
         self.rFov = rFov
+        if ephMode.lower() not in ('2body', 'nbody'):
+            raise ValueError('Ephemeris generation must be 2body or nbody.')
+        self.ephMode = ephMode
+        self.obsCode = obsCode
         self.obsTimeCol = obsTimeCol
         self.obsTimeScale = obsTimeScale
         self.seeingCol = seeingCol
@@ -69,18 +76,51 @@ class BaseObs(object):
         self.obsDegrees = obsDegrees
         self.colors = {}
 
-    def setOrbits(self, orbitObj):
-        """Set the orbital parameters.
+    def setupEphemerides(self, ephfile=None):
+        """Set up the ephemeris generator, with ephfile. Save the setup PyOrbEphemeris class.
+
+        This uses the default engine, pyoorb - however this could be overwritten to use another generator.
 
         Parameters
         ----------
-        orbitObj: lsst.sims.movingObjects.Orbits
-            An "Orbits" object with orbital parameter values.
+        ephfile: str or None, opt
+            The name of the planetary ephemerides file to use for ephemeris generation.
+            Default is the default for PyOrbEphemerides.
         """
-        if isinstance(orbitObj, Orbits):
-            self.orbits = orbitObj
+        self.ephems = PyOrbEphemerides(ephfile=ephfile)
+
+    def generateEphemerides(self, sso, times, ephMode=None):
+        """Generate ephemerides for 'sso' at times 'times' (assuming MJDs, with timescale self.obsTimeScale).
+
+        The default engine here is pyoorb, however this method could be overwritten to use another ephemeris
+        generator, such as ADAM.
+
+        The initialized pyoorb class (PyOrbEphemerides) is saved, to skip setup on subsequent calls.
+
+        Parameters
+        ----------
+        sso: lsst.sims.movingObjects.Orbits
+            Typically this will be a single object.
+        times: np.ndarray
+            The times at which to generate ephemerides. MJD.
+        ephMode: str or None, opt
+            Potentially override default ephMode (self.ephMode). Must be '2body' or 'nbody'.
+
+        Returns
+        -------
+        pandas.Dataframe
+            Ephemerides of the sso.
+        """
+        if ephMode is None:
+            ephMode = self.ephMode
+        ephTimes = self.ephems._convertTimes(times, timescale=self.obsTimeScale)
+        self.ephems.setOrbits(sso)
+        if ephMode == '2body':
+            oorbEphs = self.ephems._generateOorbEphs2body(ephTimes, obscode=self.obscode)
         else:
-            raise ValueError('Expected an lsst.sims.movingObjects.Orbit object.')
+            oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=self.obscode)
+        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
+        return ephs
 
     def calcTrailingLosses(self, velocity, seeing, texp=30.):
         """Calculate the detection and SNR trailing losses.
@@ -254,7 +294,7 @@ class BaseObs(object):
                 mjd = ModifiedJulianDate(TAI=mjd_date)
             elif self.obsTimeScale == 'UTC':
                 mjd = ModifiedJulianDate(UTC=mjd_date)
-            if not self.degrees:
+            if not self.obsDegrees:
                 obs_metadata = ObservationMetaData(pointingRA=np.degrees(obsData[idx][self.obsRA]),
                                                    pointingDec=np.degrees(obsData[idx][self.obsDec]),
                                                    rotSkyPos=np.degrees(obsData[idx][self.obsRotSkyPos]),

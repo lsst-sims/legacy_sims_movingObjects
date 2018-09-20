@@ -32,4 +32,3 @@ from .baseObs import *
 from .linearObs import *
 from .directObs import *
 from .chebyObs import *
-from .lsstCameraFootprint import *

@@ -6,10 +6,8 @@ import argparse
 import numpy as np
 
 from lsst.sims.movingObjects import Orbits
-from lsst.sims.movingObjects import LsstCameraFootprint
 from lsst.sims.movingObjects import LinearObs
 from lsst.sims.movingObjects import DirectObs
-from lsst.sims.movingObjects import fixObsData
 
 from lsst.sims.maf.db import OpsimDatabase
 from lsst.sims.maf.batches import getColMap
@@ -31,7 +29,7 @@ def readOpsim(opsimfile, constraint=None, dbcols=None):
     simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
     opsdb.close()
     print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
-    simdata = fixObsData(simdata, degreesIn=degreesIn)
+    #simdata = fixObsData(simdata, degreesIn=degreesIn)
     return simdata, colmap
 
 def readOrbits(orbitfile):
@@ -51,7 +49,7 @@ def setupColors(obs, filterlist):
         obs.calcColors(sedname)
     return obs
 
-def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep, ephMode, colmap):
+def linearObs(orbits, opsimdata, args, colmap):
     colkwargs = {'timeCol': colmap['mjd'],
                  'seeingCol': colmap['seeingGeom'],
                  'visitExpTimeCol': colmap['exptime']}
@@ -66,7 +64,7 @@ def linearObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, tstep,
     obs.run(opsimdata, obsFile, tstep=tstep)
     print("Wrote output observations to file %s using linear interpolation." % (obsFile))
 
-def directObs(orbits, opsimdata, obsFile, cameraFootprint, rFov, obscode, ephMode, colmap):
+def directObs(orbits, opsimdata, obsFile, args, colmap):
     colkwargs = {'timeCol': colmap['mjd'],
                  'seeingCol': colmap['seeingGeom'],
                  'visitExpTimeCol': colmap['exptime']}
@@ -115,17 +113,17 @@ if __name__ == '__main__':
 
 
     # Check interpolation type.
-    if args.interpolation not in ('linear', 'chebyshev', 'direct'):
-        print("Must choose linear, chebyshev or direct interpolation method.")
+    if args.interpolation not in ('linear', 'direct'):
+        print("Must choose linear or direct interpolation method.")
         exit()
 
     orbitbase = '.'.join(os.path.split(args.orbitFile)[-1].split('.')[:-1])
     opsimRun = os.path.split(args.opsimDb)[-1].replace('_sqlite.db', '').replace('.db', '')
 
     if args.obsFile is None:
-        obsFile = os.path.join(args.outDir, '%s__%s_obs.txt' % (opsimRun, orbitbase))
+        args.obsFile = os.path.join(args.outDir, '%s__%s_obs.txt' % (opsimRun, orbitbase))
     else:
-        obsFile = os.path.join(args.outDir, args.obsFile)
+        args.obsFile = os.path.join(args.outDir, args.obsFile)
 
     # Read orbits.
     orbits = readOrbits(args.orbitFile)
@@ -133,18 +131,12 @@ if __name__ == '__main__':
     # Read opsim data
     opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint, dbcols=None)
 
-    # Set up camera.
-    if args.noCamera:
-        print("Not using camera footprint: using circular fov with %f degrees radius" % (args.rFov))
-        cameraFootprint = None
-    else:
-        print("Using camera footprint.")
-        cameraFootprint = LsstCameraFootprint()
-
+    # Generate ephemerides.
     if args.interpolation == 'linear':
-        linearObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode,
-                  args.tStep, args.ephMode, colmap)
+        linearObs(orbits, opsimdata, args, colmap)
 
-    if args.interpolation == 'direct':
-        directObs(orbits, opsimdata, obsFile, cameraFootprint, args.rFov, args.obscode, args.ephMode,
-                  colmap)
+    elif args.interpolation == 'direct':
+        directObs(orbits, opsimdata, args, colmap)
+
+    else:
+        print("Exiting - failure understanding ephemeris generation method.")

@@ -1,7 +1,6 @@
 from __future__ import print_function, division
 import numpy as np
 
-from .ooephemerides import PyOrbEphemerides
 from .baseObs import BaseObs
 
 __all__ = ['DirectObs']
@@ -17,25 +16,23 @@ class DirectObs(BaseObs):
 
 
     """
-    def __init__(self, cameraFootprint=True, rFov=1.75,
-                 ephfile=None, timescale='TAI', obscode='I11',
-                 **kwargs):
-        super().__init__(cameraFootprint, rFov, **kwargs)
-        self.ephems = PyOrbEphemerides(ephfile=ephfile)
-        self.timescale = timescale
-        self.obscode = obscode
+    def setup(self, ephfile, tstep, outfileName):
+        """Set some parameters for generating ephemerides and writing to disk.
 
-    def generateEphs(self, sso, times, ephMode):
-        """Generate ephemerides.
+        Parameters
+        ----------
+        ephfile: str or None, opt
+            The name of the planetary ephemerides file to use for ephemeris generation.
+            Default is the default for PyOrbEphemerides.
+        tstep : float, opt
+            The time between points in the ephemeris grid, in days.
+            Default 2 hours.
+        outfileName : str
+            The output file name.
         """
-        self.ephems.setOrbits(sso)
-        ephTimes = self.ephems._convertTimes(times, self.timescale)
-        if ephMode == '2body':
-            oorbEphs = self.ephems._generateOorbEphs2body(ephTimes, obscode=self.obscode)
-        else:
-            oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=self.obscode)
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
-        return ephs
+        self.setupEphemerides(ephfile)
+        self.tstep = tstep
+        self.outfileName = outfileName
 
     def run(self, obsData, outfileName, epoch=2000.0):
         """Generate the observations of the objects.

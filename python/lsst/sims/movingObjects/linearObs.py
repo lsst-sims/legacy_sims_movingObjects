@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import numpy as np
-from itertools import repeat
 from scipy import interpolate
 
 from .ooephemerides import PyOrbEphemerides
@@ -17,56 +16,34 @@ class LinearObs(BaseObs):
 
     Parameters
     ----------
-    cameraFootprint : CameraFootprint, opt
-        A cameraFootprint class (which provides a way to determine if observations fall into a given
-        camera footprint), such as lsstCameraFootprint.
-        If none provided, a simple circular FOV is available from the BaseObs class.
+    cameraFootprint : bool, opt
+        If True, then use the camera footprint exactly. If False, then only use rFov.
+        Default False (use rFov only).
     rFov : float, opt
         Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
         Default 1.75 degrees.
-    timeCol : str, opt
-        Name of the column (in the simulated pointing history) for Time (MJD).
-        Default observationStartMJD.
-    seeingCol : str, opt
-        Name of the column (in the simulated pointing history) for the physical size of the seeing.
-        Default seeingFwhmGeom.
-    visitExpTimeCol : str, opt
-        Name of the column (in the simulated pointing history) for the visit exposure time.
-        Default visitExposureTime.
+    ephMode: str, opt
+        Mode for ephemeris generation - nbody or 2body. Default is 2body.
+    obsCode: str, opt
+        Observatory code for ephemeris generation. Default is "I11" - Cerro Pachon.
+    obsTimeCol: str, opt
+        Name of the time column in the obsData. Default 'observationStartMJD'.
+    obsTimeScale: str, opt
+        Type of timescale for MJD (TAI or UTC currently). Default TAI.
+    seeingCol: str, opt
+        Name of the seeing column in the obsData. Default 'seeingFwhmGeom'.
+        This should be the geometric/physical seeing as it is used for the trailing loss calculation.
+    visitExpTimeCol: str, opt
+        Name of the visit exposure time column in the obsData. Default 'visitExposureTime'.
+    obsRa: str, opt
+        Name of the RA column in the obsData. Default 'fieldRA'.
+    obsDec: str, opt
+        Name of the Dec column in the obsData. Default 'fieldDec'.
+    obsRotSkyPos: str, opt
+        Name of the Rotator column in the obsData. Default 'rotSkyPos'.
+    obsDegrees: bool, opt
+        Whether the observational data is in degrees or radians. Default True (degrees).
     """
-    def __init__(self, cameraFootprint=None, rFov=1.75,
-                 ephfile=None, timescale='TAI', obscode='I11', ephMode='2body', **kwargs):
-        super(LinearObs, self).__init__(cameraFootprint, rFov, **kwargs)
-        self.ephems = PyOrbEphemerides(ephfile=ephfile)
-        self.timescale = timescale
-        self.obscode = obscode
-        if ephMode.lower() not in ('2body', 'nbody'):
-            raise ValueError('Ephemeris generation must be 2body or nbody.')
-        self.ephMode = ephMode
-
-    def setTimes(self, times):
-        """Set an array for oorb of the ephemeris times desired, given an explicit set of times.
-
-        Parameters
-        ----------
-        times : numpy.ndarray
-            Array of the actual times of each ephemeris position.
-        """
-        self.ephTimes = self.ephems._convertTimes(times, timeScale=self.timescale)
-
-    def generateEphs(self, sso):
-        """Generate ephemerides for all times in self.ephTimes.
-
-        This sets up the grid of ephemerides to linearly interpolate between.
-        """
-        self.ephems.setOrbits(sso)
-        if self.ephMode == '2body':
-            oorbEphs = self.ephems._generateOorbEphs2body(self.ephTimes, obscode=self.obscode)
-        else:
-            oorbEphs = self.ephems._generateOorbEphs(self.ephTimes, obscode=self.obscode)
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
-        return ephs
-
     # Linear interpolation
     def makeInterps(self, ephs, i=0):
         """Generate the interpolation functions for the linear interpolation.
@@ -122,7 +99,25 @@ class LinearObs(BaseObs):
         ephs['time'] = times
         return ephs
 
-    def run(self, obsData, outfileName, tstep=2./24., epoch=2000.0):
+    def setup(self, ephfile, tstep, outfileName):
+        """Set some parameters for generating ephemerides and writing to disk.
+
+        Parameters
+        ----------
+        ephfile: str or None, opt
+            The name of the planetary ephemerides file to use for ephemeris generation.
+            Default is the default for PyOrbEphemerides.
+        tstep : float, opt
+            The time between points in the ephemeris grid, in days.
+            Default 2 hours.
+        outfileName : str
+            The output file name.
+        """
+        self.setupEphemerides(ephfile)
+        self.tstep = tstep
+        self.outfileName = outfileName
+
+    def run(self, orbits, obsData):
         """Find and write the observations of each object to disk.
 
         For each object, identify the observations where the object is
@@ -132,6 +127,8 @@ class LinearObs(BaseObs):
 
         Parameters
         ----------
+        orbits: lsst.sims.movingObjects.Orbits
+            The orbits to generate ephemerides for.
         obsData : np.recarray
             The simulated pointing history data.
         outfileName : str
@@ -139,30 +136,26 @@ class LinearObs(BaseObs):
         tstep : float, opt
             The time between points in the ephemeris grid, in days.
             Default 2 hours.
-        epoch : float, opt
-            The epoch of the RA/Dec reference frame.
-            Default 2000.0
         """
         # Set the times for the ephemeris grid.
-        timeStep = float(tstep)
-        timeStart = obsData[self.timeCol].min() - timeStep
-        timeEnd = obsData[self.timeCol].max() + timeStep
+        timeStep = float(self.tstep)
+        timeStart = obsData[self.obsTimeCol].min() - timeStep
+        timeEnd = obsData[self.obsTimeCol].max() + timeStep
         times = np.arange(timeStart, timeEnd + timeStep / 2.0, timeStep)
-        self.setTimes(times)
         print('Generating ephemerides on a grid of %f day timesteps, then will extrapolate to opsim times.'
               % (tstep))
         # For each object, identify observations where the object is within the FOV (or camera footprint).
-        for sso in self.orbits:
+        for sso in orbits:
             objid = sso.orbits['objId'].iloc[0]
             sedname = sso.orbits['sed_filename'].iloc[0]
-            ephs = self.generateEphs(sso)
+            ephs = self.generateEphemerides(sso, times)
             interpfuncs = self.makeInterps(ephs)
-            ephs = self.interpEphs(interpfuncs, times=obsData[self.timeCol], columns=['ra', 'dec'])
-            if self.cameraFootprint is None:
-                idxObs = self.ssoInCircleFov(ephs, obsData, rFov=self.rFov)
+            ephs = self.interpEphs(interpfuncs, times=obsData[self.obsTimeCol], columns=['ra', 'dec'])
+            if self.cameraFootprint:
+                idxObs = self.ssoInCameraFov(ephs, obsData)
             else:
-                idxObs = self.cameraFootprint.inCameraFov(ephs, obsData, epoch, self.timeCol)
+                idxObs = self.ssoInCircleFov(ephs, obsData)
             obsdat = obsData[idxObs]
-            ephs = self.interpEphs(interpfuncs, times=obsdat[self.timeCol])
+            ephs = self.interpEphs(interpfuncs, times=obsdat[self.obsTimeCol])
             # Write these observations to disk.
-            self.writeObs(objid, ephs, obsdat, sedname=sedname, outfileName=outfileName)
+            self.writeObs(objid, ephs, obsdat, sedname=sedname, outfileName=self.outfileName)
