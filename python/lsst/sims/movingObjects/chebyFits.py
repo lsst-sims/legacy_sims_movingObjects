@@ -185,6 +185,7 @@ class ChebyFits(object):
             The times to use for ephemeris generation.
         """
         return self.pyephems.generateEphemerides(times, obscode=self.obscode,
+                                                 ephMode='N', ephType='basic',
                                                  timeScale=self.timeScale, byObject=byObject,
                                                  verbose=verbose)
 
@@ -235,7 +236,7 @@ class ChebyFits(object):
         # this is not efficient .. a point near the start should be fine).
         times = np.arange(self.tStart, self.tStart + length + timestep / 2, timestep)
         # We must regenerate ephemerides here, because the timestep is different each time.
-        ephs = self.generateEphemerides(times, byObject=True)
+        ephs = self.generateEphemerides(times, ephMode='N', ephType='basic', byObject=True)
         # Look for the coefficients and residuals.
         for i, e in enumerate(ephs):
             coeff_ra, coeff_dec, max_pos_resids[i] = self._getCoeffsPosition(e)
