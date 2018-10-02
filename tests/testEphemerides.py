@@ -4,7 +4,6 @@ import os
 import numpy as np
 import pandas as pd
 from astropy.time import Time
-from pandas.util.testing import assert_frame_equal
 from lsst.sims.movingObjects import Orbits
 from lsst.sims.movingObjects import PyOrbEphemerides
 from lsst.utils import getPackageDir
@@ -80,38 +79,43 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.ephems.setOrbits(self.orbits)
         times = np.arange(49353, 49353 + 3, 0.25)
         ephTimes = self.ephems._convertTimes(times)
-        oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807, ephMode='N')
         # Check that it returned the right sort of array.
-        self.assertEqual(oorbEphs.shape, (len(self.ephems.oorbElem), len(times), 14))
+        self.assertEqual(oorbEphs.shape, (len(self.ephems.oorbElem), len(times), 12))
+        oorbEphs = self.ephems._generateOorbEphsFull(ephTimes, obscode=807, ephMode='N')
+        # Check that it returned the right sort of array.
+        self.assertEqual(oorbEphs.shape, (len(self.ephems.oorbElem), len(times), 35))
 
     def testEphemeris(self):
         # Calculate and convert ephemerides.
         self.ephems.setOrbits(self.orbits)
         times = np.arange(49353, 49353 + 2, 0.3)
         ephTimes = self.ephems._convertTimes(times)
-        oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807)
         # Group by object, and check grouping.
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
+        ephs = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=True)
         self.assertEqual(len(ephs), len(self.orbits))
         # Group by time, and check grouping.
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
+        ephs = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=False)
         self.assertEqual(len(ephs), len(times))
         # And test all-wrapped-up method:
         ephsAll = self.ephems.generateEphemerides(times, obscode=807,
+                                                  ephMode='N', ephType='basic',
                                                   timeScale='UTC', byObject=False)
         np.testing.assert_equal(ephsAll, ephs)
         # Reset ephems to use KEP Orbits, and calculate new ephemerides.
         self.ephems.setOrbits(self.orbitsKEP)
-        oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=807)
-        ephsKEP = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807)
+        ephsKEP = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=True)
         self.assertEqual(len(ephsKEP), len(self.orbitsKEP))
-        ephsKEP = self.ephems._convertOorbEphs(oorbEphs, byObject=False)
+        ephsKEP = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=False)
         self.assertEqual(len(ephsKEP), len(times))
         # Check that ephemerides calculated by each method are almost equal.
         for column in ephs.dtype.names:
             np.testing.assert_allclose(ephs[column], ephsKEP[column], rtol=0, atol=1e-7)
         # And test all-wrapped-up method:
         ephsAllKEP = self.ephems.generateEphemerides(times, obscode=807,
+                                                     ephMode='N', ephType='basic',
                                                      timeScale='UTC', byObject=False)
         np.testing.assert_equal(ephsAllKEP, ephsKEP)
         # Check that the wrapped method using KEP elements and the wrapped method using COM elements match.
@@ -152,7 +156,8 @@ class TestJPLValues(unittest.TestCase):
             subOrbits.setOrbits(suborbits)
             ephems = PyOrbEphemerides()
             ephems.setOrbits(subOrbits)
-            ephs = ephems.generateEphemerides([t], timeScale='UTC', obscode=807, byObject=False)
+            ephs = ephems.generateEphemerides([t], timeScale='UTC', obscode=807,
+                                              ephMode='N', ephType='Basic', byObject=False)
             deltaRA[i] = np.abs(ephs['ra'] - j['ra_deg'].as_matrix()).max()
             deltaDec[i] = np.abs(ephs['dec'] - j['dec_deg'].as_matrix()).max()
         # Convert to mas
