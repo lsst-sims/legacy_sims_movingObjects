@@ -23,14 +23,29 @@ class BaseObs(object):
 
     Parameters
     ----------
-    cameraFootprint : bool, opt
-        If True, then use the camera footprint exactly. If False, then only use rFov.
-        Default False (use rFov only).
+    footPrint: str, opt
+        Specify the footprint for the FOV. Options include "camera", "circle", "rectangle".
+        'Camera' means use the actual LSST camera footprint (following a rough cut with a circular FOV).
+        Default is circular FOV.
     rFov : float, opt
-        Radius of the fov, to use for a circular FOV if cameraFootprint is None, in degrees.
+        If footprint is "circular", this is the radius of the fov (in degrees).
         Default 1.75 degrees.
+    xTol : float, opt
+        If footprint is "rectangular", this is half of the width of the (on-sky) fov in the RA
+        direction (in degrees).
+        Default 5 degrees. (so size of footprint in degrees will be 10 degrees in the RA direction).
+    yTol : float, opt
+        If footprint is "rectangular", this is half of the width of the fov in Declination (in degrees).
+        Default is 3 degrees (so size of footprint in degrees will be 6 degrees in the Dec direction).
     ephMode: str, opt
-        Mode for ephemeris generation - nbody or 2body. Default is 2body.
+        Mode for ephemeris generation - nbody or 2body. Default is nbody.
+    ephType: str, opt
+        Type of ephemerides to generate - full or basic.
+        Full includes all values calculated by openorb; Basic includes a more basic set.
+        Default is Basic.  (this includes enough information for most standard MAF metrics).
+    ephFile: str or None, opt
+        The name of the planetary ephemerides file to use for ephemeris generation.
+        Default (None) will use the default for PyOrbEphemerides.
     obsCode: str, opt
         Observatory code for ephemeris generation. Default is "I11" - Cerro Pachon.
     obsTimeCol: str, opt
@@ -42,7 +57,7 @@ class BaseObs(object):
         This should be the geometric/physical seeing as it is used for the trailing loss calculation.
     visitExpTimeCol: str, opt
         Name of the visit exposure time column in the obsData. Default 'visitExposureTime'.
-    obsRa: str, opt
+    obsRA: str, opt
         Name of the RA column in the obsData. Default 'fieldRA'.
     obsDec: str, opt
         Name of the Dec column in the obsData. Default 'fieldDec'.
@@ -50,21 +65,37 @@ class BaseObs(object):
         Name of the Rotator column in the obsData. Default 'rotSkyPos'.
     obsDegrees: bool, opt
         Whether the observational data is in degrees or radians. Default True (degrees).
+    outfileName : str, opt
+        The output file name.
+        Default is 'lsst_obs.dat'.
+    obsMetadata : str, opt
+        A string that captures provenance information about the observations.
+        For example: 'kraken_2026, MJD 59853-61677' or 'baseline2018a minus NES'
+        Default ''.
     """
-    def __init__(self, cameraFootprint=False, rFov=1.75,
-                 ephMode='2body', obsCode='I11',
+    def __init__(self, footprint='circle', rFov=1.75, xTol=5, yTol=3,
+                 ephMode='nbody', ephType='basic', obsCode='I11',
+                 ephFile=None,
                  obsTimeCol='observationStartMJD', obsTimeScale='TAI',
                  seeingCol='seeingFwhmGeom', visitExpTimeCol='visitExposureTime',
-                 obsRA='fieldRA', obsDec='fieldDec', obsRotSkyPos='rotSkyPos', obsDegrees=True):
-        self.cameraFootprint = cameraFootprint
-        if self.cameraFootprint:
+                 obsRA='fieldRA', obsDec='fieldDec', obsRotSkyPos='rotSkyPos', obsDegrees=True,
+                 outfileName='lsst_obs.dat', obsMetadata=''):
+        # Values for identifying observations.
+        self.footprint = footprint.lower()
+        if self.footprint == 'camera':
             self.camera = lsst_camera()
             self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
                                   GUIDER: 'guider', FOCUS: 'focus'}
         self.rFov = rFov
+        self.xTol = xTol
+        self.yTol = yTol
+        # Values for ephemeris generation.
         if ephMode.lower() not in ('2body', 'nbody'):
             raise ValueError('Ephemeris generation must be 2body or nbody.')
         self.ephMode = ephMode
+        self.ephType = ephType
+        self.ephFile = ephFile
+        # Strings relating to the names of columns in the observation metadata.
         self.obsCode = obsCode
         self.obsTimeCol = obsTimeCol
         self.obsTimeScale = obsTimeScale
@@ -74,22 +105,22 @@ class BaseObs(object):
         self.obsDec = obsDec
         self.obsRotSkyPos = obsRotSkyPos
         self.obsDegrees = obsDegrees
+        # Save a space for the standard object colors.
         self.colors = {}
+        self.outfileName = outfileName
+        if obsMetadata == '':
+            self.obsMetadata = 'unknown simdata source'
+        else:
+            self.obsMetadata = obsMetadata
 
-    def setupEphemerides(self, ephfile=None):
-        """Set up the ephemeris generator, with ephfile. Save the setup PyOrbEphemeris class.
+    def setupEphemerides(self):
+        """Initialize the ephemeris generator. Save the setup PyOrbEphemeris class.
 
         This uses the default engine, pyoorb - however this could be overwritten to use another generator.
-
-        Parameters
-        ----------
-        ephfile: str or None, opt
-            The name of the planetary ephemerides file to use for ephemeris generation.
-            Default is the default for PyOrbEphemerides.
         """
-        self.ephems = PyOrbEphemerides(ephfile=ephfile)
+        self.ephems = PyOrbEphemerides(ephfile=self.ephFile)
 
-    def generateEphemerides(self, sso, times, ephMode=None):
+    def generateEphemerides(self, sso, times, ephMode=None, ephType=None):
         """Generate ephemerides for 'sso' at times 'times' (assuming MJDs, with timescale self.obsTimeScale).
 
         The default engine here is pyoorb, however this method could be overwritten to use another ephemeris
@@ -111,15 +142,17 @@ class BaseObs(object):
         pandas.Dataframe
             Ephemerides of the sso.
         """
+        if not hasattr(self, "ephems"):
+            self.setupEphemerides()
         if ephMode is None:
             ephMode = self.ephMode
-        ephTimes = self.ephems._convertTimes(times, timescale=self.obsTimeScale)
+        if ephType is None:
+            ephType = self.ephType
         self.ephems.setOrbits(sso)
-        if ephMode == '2body':
-            oorbEphs = self.ephems._generateOorbEphs2body(ephTimes, obscode=self.obscode)
-        else:
-            oorbEphs = self.ephems._generateOorbEphs(ephTimes, obscode=self.obscode)
-        ephs = self.ephems._convertOorbEphs(oorbEphs, byObject=True)
+        ephs = self.ephems.generateEphemerides(times, timeScale = self.obsTimeScale,
+                                               obscode = self.obsCode,
+                                               ephMode=ephMode, ephType=ephType,
+                                               byObject=True)
         return ephs
 
     def calcTrailingLosses(self, velocity, seeing, texp=30.):
@@ -238,7 +271,7 @@ class BaseObs(object):
                 self.colors[sedname][f] = moSed.calcMag(self.lsst[f]) - vmag
         return self.colors[sedname]
 
-    def ssoInCircleFov(self, ephems, obsData, rFov=2.1):
+    def ssoInCircleFov(self, ephems, obsData):
         """Determine which observations are within a circular fov for a series of observations.
         Note that ephems and obsData must be the same length.
 
@@ -248,16 +281,15 @@ class BaseObs(object):
             Ephemerides for the objects.
         obsData : np.recarray
             The observation pointings.
-        rFov : float, opt
-            The radius of the field of view, in degrees.
-            Default 2.1 is appropriate for LSST fov if later applying camera footprint.
-            A value of 1.75 would be appropriate for a simple circular LSST FOV assumption.
 
         Returns
         -------
         numpy.ndarray
             Returns the indexes of the numpy array of the object observations which are inside the fov.
         """
+        return self._ssoInCircleFov(ephems, obsData, self.rFov)
+
+    def _ssoInCircleFov(self, ephems, obsData, rFov):
         if not self.obsDegrees:
             sep = angularSeparation(ephems['ra'], ephems['dec'],
                                     np.degrees(obsData[self.obsRA]), np.degrees(obsData[self.obsDec]))
@@ -265,6 +297,30 @@ class BaseObs(object):
             sep = angularSeparation(ephems['ra'], ephems['dec'],
                                     obsData[self.obsRA], obsData[self.obsDec])
         idxObs = np.where(sep <= rFov)[0]
+        return idxObs
+
+    def ssoInRectangleFov(self, ephems, obsData):
+        """Determine which observations are within a rectangular FoV for a series of observations.
+        Note that ephems and obsData must be the same length.
+
+        Parameters
+        ----------
+        ephems : np.recarray
+            Ephemerides for the objects.
+        obsData : np.recarray
+            The observation pointings.
+
+        Returns
+        -------
+        numpy.ndarray
+            Returns the indexes of the numpy array of the object observations which are inside the fov.
+        """
+        return self._ssoInRectangleFov(ephems, obsData, self.xTol, self.yTol)
+
+    def _ssoInRectangleFov(self, ephems, obsData, xTol, yTol):
+        deltaDec = np.abs(ephems['dec'] - obsData[self.obsDec])
+        deltaRa = np.abs((ephems['ra'] - obsData[self.obsRA]) * np.cos(np.radians(obsData[self.obsDec])))
+        idxObs = np.where((deltaDec <= yTol) & (deltaRa <= xTol))[0]
         return idxObs
 
     def ssoInCameraFov(self, ephems, obsData):
@@ -285,7 +341,7 @@ class BaseObs(object):
         """
         epoch = 2000.0
         # See if the object is within 'rFov' of the center of the boresight.
-        idxObsRough = self.ssoInCircleFov(ephems, obsData, rFov=2.1)
+        idxObsRough = self._ssoInCircleFov(ephems, obsData, rFov=2.1)
         # Then test for the camera footprint exactly.
         idxObs = []
         for idx in idxObsRough:
@@ -294,6 +350,9 @@ class BaseObs(object):
                 mjd = ModifiedJulianDate(TAI=mjd_date)
             elif self.obsTimeScale == 'UTC':
                 mjd = ModifiedJulianDate(UTC=mjd_date)
+            else:
+                warnings.warn('Expected timescale of TAI or UTC, but did not match. Using TAI.')
+                mjd = ModifiedJulianDate(TAI=mjd_date)
             if not self.obsDegrees:
                 obs_metadata = ObservationMetaData(pointingRA=np.degrees(obsData[idx][self.obsRA]),
                                                    pointingDec=np.degrees(obsData[idx][self.obsDec]),
@@ -316,19 +375,70 @@ class BaseObs(object):
         idxObs = np.array(idxObs, int)
         return idxObs
 
+    def ssoInFov(self, ephems, obsData):
+        """Convenience layer - determine which footprint method to apply (from self.footprint) and use it.
+
+        Parameters
+        ----------
+        ephems : np.recarray
+            Ephemerides for the objects.
+        obsData : np.recarray
+            Observation pointings.
+
+        Returns
+        -------
+        np.ndarray
+            Returns the indexes of the numpy array of the object observations which are inside the fov.
+        """
+        if self.footprint == "camera":
+            return self.ssoInCameraFov(ephems, obsData)
+        elif self.footprint == "rectangle":
+            return self.ssoInRectangleFov(ephems, obsData)
+        elif self.footprint == "circle":
+            return self.ssoInCircleFov(ephems, obsData)
+        else:
+            warnings.warn("Using circular fov; could not match specified footprint.")
+            self.footprint = 'circle'
+            return self.ssoInCircleFov(ephems, obsData)
+
     # Put together the output.
-    def _openOutput(self, outfileName):
+    def _openOutput(self):
         # Make sure the directory exists to write the output file into.
-        outDir = os.path.split(outfileName)[0]
+        outDir = os.path.split(self.outfileName)[0]
         if len(outDir) > 0:
             if not os.path.isdir(outDir):
                 os.makedirs(outDir)
         # Open the output file for writing.
-        self.outfile = open(outfileName, 'w')
+        self.outfile = open(self.outfileName, 'w')
+        # Write metadata into the header, using # to identify as comment lines.
+        self.outfile.write('# %s\n' % self.obsMetadata)
+        self.outfile.write('# %s\n' % self.outfileName)
+        # Write some generic ephemeris generation information.
+        self.outfile.write('# ephemeris generation via %s\n' % self.ephems.__class__.__name__)
+        self.outfile.write('# planetary ephemeris file %s \n' % self.ephems.ephfile)
+        self.outfile.write('# obscode %s\n' % self.obsCode)
+        # Write some class-specific metadata about observation generation.
+        self._headerMeta()
+        # Write the footprint information.
+        self.outfile.write('# pointing footprint %s\n' % (self.footprint))
+        if self.footprint == 'circle':
+            self.outfile.write('# rfov %f\n' % self.rFov)
+        if self.footprint == 'rectangle':
+            self.outfile.write('# xTol %f yTol %f\n' % (self.xTol, self.yTol))
+        # Record columns used from simulation data
+        self.outfile.write('# obsRA %s obsDec %s obsRotSkyPos %s obsDeg %s\n'
+                           % (self.obsRA, self.obsDec, self.obsRotSkyPos, self.obsDegrees))
+        self.outfile.write('# obsMJD %s obsTimeScale %s seeing %s expTime %s\n'
+                           % (self.obsTimeCol, self.obsTimeScale, self.seeingCol, self.visitExpTimeCol))
+
         self.wroteHeader = False
 
-    def writeObs(self, objId, objEphs, obsData, outfileName='out.txt',
-                 sedname='C.dat'):
+    def _headerMeta(self):
+        # Generic class header metadata, should be overriden with class specific version.
+        self.outfile.write('# generic header metadata\n')
+        self.outfile.write('# ephMode %s\n' % (self.ephMode))
+
+    def writeObs(self, objId, objEphs, obsData, sedname='C.dat'):
         """
         Call for each object; write out the observations of each object.
 
@@ -351,8 +461,6 @@ class BaseObs(object):
         obsData : numpy.ndarray
             The observation details from the simulated pointing history, for all observations of
             the object. All columns automatically propagated to the output file.
-        outfileName : str, opt
-            Output file name. Default 'out.txt'
         sedname : str, out
             The sed_filename for the object (from the orbital parameters).
             Used to calculate the appropriate color terms for the output file.
@@ -362,10 +470,8 @@ class BaseObs(object):
         if len(objEphs) == 0:
             return
         # Open file if needed.
-        try:
-            self.outfile
-        except AttributeError:
-            self._openOutput(outfileName)
+        if not hasattr(self, "outfile"):
+            self._openOutput()
         # Calculate the extra columns we want to write out
         # (dmag due to color, trailing loss, and detection loss)
         # First calculate and match the color dmag term.
