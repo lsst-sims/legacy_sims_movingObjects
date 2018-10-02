@@ -243,11 +243,15 @@ class Orbits(object):
             file.close()
 
             if skiprows == -1:
-                # No header; assume it's a typical DES file.
-                names = ('objId', 'FORMAT', 'q', 'e', 'i', 'node', 'argperi', 't_p',
-                         'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
+                # No header; assume it's a typical DES file - but is format KEP or COM?
+                names_COM = ('objId', 'FORMAT', 'q', 'e', 'i', 'node', 'argperi', 't_p',
+                             'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
+                names_KEP = ('objId', 'FORMAT', 'a', 'e', 'i', 'node', 'argperi', 'meanAnomaly',
+                             'H', 'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
                 orbits = pd.read_table(orbitfile, delim_whitespace=True, skiprows=0,
-                                       names=names)
+                                       names=names_COM)
+                if orbits['FORMAT'][0] == 'KEP':
+                    orbits.columns = names_KEP
 
             else:
                 # There is a header, but we also need to check if there is a comment key at the start
