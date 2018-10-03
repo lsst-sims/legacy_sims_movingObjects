@@ -83,9 +83,7 @@ class BaseObs(object):
         # Values for identifying observations.
         self.footprint = footprint.lower()
         if self.footprint == 'camera':
-            self.camera = lsst_camera()
-            self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
-                                  GUIDER: 'guider', FOCUS: 'focus'}
+            self._setupCamera()
         self.rFov = rFov
         self.xTol = xTol
         self.yTol = yTol
@@ -112,6 +110,11 @@ class BaseObs(object):
             self.obsMetadata = 'unknown simdata source'
         else:
             self.obsMetadata = obsMetadata
+
+    def _setupCamera(self):
+        self.camera = lsst_camera()
+        self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
+                              GUIDER: 'guider', FOCUS: 'focus'}
 
     def setupEphemerides(self):
         """Initialize the ephemeris generator. Save the setup PyOrbEphemeris class.
@@ -339,6 +342,8 @@ class BaseObs(object):
         np.ndarray
             Returns the indexes of the numpy array of the object observations which are inside the fov.
         """
+        if not hasattr(self, 'camera'):
+            self._setupCamera()
         epoch = 2000.0
         # See if the object is within 'rFov' of the center of the boresight.
         idxObsRough = self._ssoInCircleFov(ephems, obsData, rFov=2.1)

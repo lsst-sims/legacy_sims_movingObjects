@@ -236,7 +236,7 @@ class ChebyFits(object):
         # this is not efficient .. a point near the start should be fine).
         times = np.arange(self.tStart, self.tStart + length + timestep / 2, timestep)
         # We must regenerate ephemerides here, because the timestep is different each time.
-        ephs = self.generateEphemerides(times, ephMode='N', ephType='basic', byObject=True)
+        ephs = self.generateEphemerides(times, byObject=True)
         # Look for the coefficients and residuals.
         for i, e in enumerate(ephs):
             coeff_ra, coeff_dec, max_pos_resids[i] = self._getCoeffsPosition(e)
@@ -467,7 +467,7 @@ class ChebyFits(object):
             # Could not find a good segment length.
             warningmessage = 'Objid %s, segment %f to %f ' % (orbitObj.orbits.objId.iloc[0],
                                                               ephs['time'][0], ephs['time'][-1])
-            warningmessage += ' - error: %s' % (ve.message)
+            warningmessage += ' - error: %s' % (ve)
             warnings.warn(warningmessage)
             self.failed += newCheby.failed
             return

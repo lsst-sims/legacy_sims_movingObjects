@@ -25,7 +25,7 @@ class TestCamera(unittest.TestCase):
                             dtype=([('ra', float), ('dec', float), ('rotSkyPos', float), ('mjd', float)]))
 
     def testCameraFov(self):
-        obs = BaseObs(obsRA='ra', obsDec='dec', obsTimeCol='mjd')
+        obs = BaseObs(obsRA='ra', obsDec='dec', obsTimeCol='mjd', footprint='camera')
         idxObs = obs.ssoInCameraFov(self.ephems, self.obs)
         self.assertEqual(idxObs, [0])
 
