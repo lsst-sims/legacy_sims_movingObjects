@@ -170,10 +170,10 @@ def setupArgs(parser=None):
         args.obsFile = os.path.join(args.outDir, args.obsFile)
 
     # Build some provenance metadata to add to output file.
-    obsMetadata = "# Opsim %s" % opsimRun
+    obsMetadata = "Opsim %s" % opsimRun
     if len(args.sqlConstraint) > 0:
         obsMetadata += ' selected with sqlconstraint %s\n' % (args.sqlConstraint)
-    obsMetadata += '# Orbitfile %s' % orbitbase
+    obsMetadata += ' + Orbitfile %s' % orbitbase
     if args.obsMetadata is not None:
         obsMetadata += '\n# %s' % args.obsMetadata
     args.obsMetadata = obsMetadata
