@@ -1,0 +1,6 @@
+(setup sims_movingObjects)
+cd doc
+
+sphinx-apidoc -o source -f -H "lsst.sims.movingObjects" ../python/
+sphinx-build -b html source ./html
+

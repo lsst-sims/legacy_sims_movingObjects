@@ -182,7 +182,7 @@ class TestJPLValues(unittest.TestCase):
             dDec = np.abs(ephs['dec'][ephorder][:,0] - j['dec_deg'][jorder]) * 3600.0 * 1000.0
             deltaRA[i] = dRA.max()
             deltaDec[i] = dDec.max()
-            if deltaRA[i] > 18:
+            if deltaRA[i] > 20:
                 print(j['objId'], ephs['objId'])
                 print(j['ra_deg'])
                 print(ephs['ra'])
@@ -194,9 +194,9 @@ class TestJPLValues(unittest.TestCase):
         print('max JPL errors', deltaRA.max(), deltaDec.max())
         print('std of JPL errors', np.std(deltaRA), np.std(deltaDec))
         self.assertLess(np.max(deltaRA), 25)
-        self.assertLess(np.max(deltaDec), 10)
+        self.assertLess(np.max(deltaDec), 25)
         self.assertLess(np.std(deltaRA), 3)
-        self.assertLess(np.std(deltaDec), 2)
+        self.assertLess(np.std(deltaDec), 3)
 
 
 if __name__ == '__main__':

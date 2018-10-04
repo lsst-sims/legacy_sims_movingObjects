@@ -22,3 +22,4 @@ python/lsst/sims/movingObjects/version.py
 *.ipynb
 .ipynb_checkpoints/*
 .idea/*
+data

@@ -185,6 +185,7 @@ class ChebyFits(object):
             The times to use for ephemeris generation.
         """
         return self.pyephems.generateEphemerides(times, obscode=self.obscode,
+                                                 ephMode='N', ephType='basic',
                                                  timeScale=self.timeScale, byObject=byObject,
                                                  verbose=verbose)
 
@@ -466,7 +467,7 @@ class ChebyFits(object):
             # Could not find a good segment length.
             warningmessage = 'Objid %s, segment %f to %f ' % (orbitObj.orbits.objId.iloc[0],
                                                               ephs['time'][0], ephs['time'][-1])
-            warningmessage += ' - error: %s' % (ve.message)
+            warningmessage += ' - error: %s' % (ve)
             warnings.warn(warningmessage)
             self.failed += newCheby.failed
             return
