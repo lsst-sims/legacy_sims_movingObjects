@@ -171,9 +171,9 @@ class TestJPLValues(unittest.TestCase):
         print('max JPL errors', np.max(deltaRA), np.max(deltaDec))
         print('std JPL errors', np.std(deltaRA), np.std(deltaDec))
         self.assertLess(np.max(deltaRA), 25)
-        self.assertLess(np.max(deltaDec), 20)
-        self.assertLess(np.std(deltaRA), 2)
-        self.assertLess(np.std(deltaDec), 1.5)
+        self.assertLess(np.max(deltaDec), 25)
+        self.assertLess(np.std(deltaRA), 3)
+        self.assertLess(np.std(deltaDec), 3)
 
 
 if __name__ == '__main__':
