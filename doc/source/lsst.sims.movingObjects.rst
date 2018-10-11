@@ -20,14 +20,6 @@ lsst.sims.movingObjects.chebyFits module
     :undoc-members:
     :show-inheritance:
 
-lsst.sims.movingObjects.chebyObs module
----------------------------------------
-
-.. automodule:: lsst.sims.movingObjects.chebyObs
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 lsst.sims.movingObjects.chebyValues module
 ------------------------------------------
 

@@ -16,9 +16,11 @@ can then evaluate metrics about the moving objects via `MAF`_.
 This package requires the LSST software stack to run, and uses
 the python bindings in the LSST fork of `OpenOrb`_ to generate ephemerides.
 
-.. _OpenOrb: http://github.com/lsst/oorb
+.. _OpenOrb: https://github.com/lsst/oorb
 
 
-Jupyter notebook `tutorial`_.
+There are examples of sims_movingObjects usage as Jupyter notebooks in the
+`examples`_ directory.
 
-.. _tutorial: tutorial.ipynb
+.. _examples: https://github.com/lsst/sims_movingObjects/examples
+
