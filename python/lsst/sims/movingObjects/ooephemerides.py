@@ -287,7 +287,7 @@ class PyOrbEphemerides(object):
             The re-arranged ephemeris values, in a 3-d array.
         """
         ephs = np.swapaxes(oorbEphs, 2, 0)
-        velocity = np.sqrt(ephs[4]**2 + ephs[5]**2)
+        velocity = np.sqrt(ephs[3]**2 + ephs[4]**2)
         if byObject:
             ephs = np.swapaxes(ephs, 2, 1)
             velocity = np.swapaxes(velocity, 1, 0)
@@ -370,7 +370,7 @@ class PyOrbEphemerides(object):
             The re-arranged ephemeris values, in a 3-d array.
         """
         ephs = np.swapaxes(oorbEphs, 2, 0)
-        velocity = np.sqrt(ephs[4]**2 + ephs[5]**2)
+        velocity = np.sqrt(ephs[3]**2 + ephs[4]**2)
         if byObject:
             ephs = np.swapaxes(ephs, 2, 1)
             velocity = np.swapaxes(velocity, 1, 0)
