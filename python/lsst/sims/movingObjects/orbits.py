@@ -97,24 +97,32 @@ class Orbits(object):
             raise ValueError('Length of the orbits dataframe was 0.')
 
         # Discover which type of orbital parameters we have on disk.
-        format = None
+        self.orb_format = None
         if 'FORMAT' in orbits:
-            format = orbits['FORMAT'].iloc[0]
+            self.orb_format = orbits['FORMAT'].iloc[0]
             del orbits['FORMAT']
-        if 'q' in orbits:
-            self.orb_format = 'COM'
-        elif 'a' in orbits:
-            self.orb_format = 'KEP'
-        elif 'x' in orbits:
-            self.orb_format = 'CART'
-        else:
-            raise ValueError("Can't determine orbital type, as neither q, a or x in input orbital elements.\n"
-                             "Was attempting to base orbital element quantities on header row, "
-                             "with columns: \n%s" % orbits.columns)
-        # Report a warning if formats don't seem to match.
-        if (format is not None) and (format != self.orb_format):
-            warnings.warn("Format from input file (%s) doesn't match determined format (%s). "
-                          "Using %s" % (format, self.orb_format, self.orb_format))
+            # Check that the orbit format is approximately right.
+            if self.orb_format == 'COM':
+                if 'q' not in orbits:
+                    raise ValueError('The stated format was COM, but "q" not present in orbital elements?')
+            if self.orb_format == 'KEP':
+                if 'a' not in orbits:
+                    raise ValueError('The stated format was KEP, but "a" not present in orbital elements?')
+            if self.orb_format == 'CART':
+                if 'x' not in orbits:
+                    raise ValueError('The stated format was CART but "x" not present in orbital elements?')
+        if self.orb_format is None:
+            # Try to figure out the format, if it wasn't provided.
+            if 'q' in orbits:
+                self.orb_format = 'COM'
+            elif 'a' in orbits:
+                self.orb_format = 'KEP'
+            elif 'x' in orbits:
+                self.orb_format = 'CART'
+            else:
+                raise ValueError("Can't determine orbital type, as neither q, a or x in input orbital elements.\n"
+                                 "Was attempting to base orbital element quantities on header row, "
+                                 "with columns: \n%s" % orbits.columns)
 
         # Check that the orbit epoch is within a 'reasonable' range, to detect possible column mismatches.
         general_epoch = orbits['epoch'].head(1).values[0]
