@@ -128,6 +128,7 @@ class DirectObs(BaseObs):
             # Generate ephemerides on the rough grid.
             ephs = self.generateEphemerides(sso, rough_times,
                                             ephMode=self.prelimEphMode, ephType=self.ephType)[0]
+            
             # Find observations which come within roughTol of the fov.
             ephsIdxs = np.searchsorted(ephs['time'], obsData[self.obsTimeCol])
             roughIdxObs = self._ssoInCircleFov(ephs[ephsIdxs], obsData, self.roughTol)

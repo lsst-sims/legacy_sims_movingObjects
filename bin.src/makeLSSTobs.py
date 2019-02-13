@@ -13,21 +13,61 @@ from lsst.sims.maf.db import OpsimDatabase
 from lsst.sims.maf.batches import getColMap
 
 
-def readOpsim(opsimfile, constraint=None, dbcols=None):
+def readOpsim(opsimfile, constraint=None, footprint='camera', dbcols=None):
     # Read opsim database.
     opsdb = OpsimDatabase(opsimfile)
-    if dbcols is None:
-        dbcols = []
+
     colmap = getColMap(opsdb)
     if 'rotSkyPos' not in colmap:
         colmap['rotSkyPos'] = 'rotSkyPos'
-    reqcols = [colmap['mjd'], colmap['night'], colmap['ra'], colmap['dec'],
-               colmap['rotSkyPos'], colmap['filter'], colmap['exptime'], colmap['seeingEff'],
-               colmap['seeingGeom'], colmap['fiveSigmaDepth'], 'solarElong']
-    for col in reqcols:
-        if col not in dbcols:
-            dbcols.append(col)
-    simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
+
+    # Set the minimum required columns.
+    min_cols = [colmap['mjd'], colmap['night'], colmap['ra'], colmap['dec'],
+                colmap['filter'], colmap['exptime'], colmap['seeingGeom'],
+                colmap['fiveSigmaDepth']]
+    if footprint == 'camera':
+        min_cols.append(colmap['rotSkyPos'])
+    if dbcols is not None:
+        min_cols += dbcols
+    min_cols = list(set(min_cols))
+
+    # Check if these minimum required columns are in the database.
+    simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
+                                  colnames=min_cols,
+                                  sqlconstraint=constraint,
+                                  numLimit=1)
+
+    # If that was successful, there are some additional columns that can be useful:
+    more_cols = [colmap['rotSkyPos'], colmap['seeingEff'], 'solarElong']
+    failed_cols = []
+    for col in more_cols:
+        try:
+            simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
+                                          colnames=[col], sqlconstraint=constraint, numLimit=1)
+        except ValueError:
+            failed_cols.append(col)
+    if len(failed_cols) > 0:
+        print('Could not find columns %s in the database, so leaving those out for now.' % failed_cols)
+    for col in failed_cols:
+        more_cols
+    print('Querying for columns:\n %s' % ())
+
+    cols = min_cols + more_cols
+    cols = list(set(cols))
+    # See if these additional columns are available.
+    try:
+        simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
+                                      colnames=cols,
+                                      sqlconstraint=constraint,
+                                      numLimit=1)
+    except ValueError:
+        # Exception .. so not all of these columns were available. Reset to 'min_cols'.
+        print('Could not find all of the additional columns in \n%s\n in the database,'
+              'so just querying and using basic set of \n%s.' % (cols, min_cols))
+        cols = min_cols
+
+    # Go ahead and query for all of the observations.
+    simdata = opsdb.fetchMetricData(cols, sqlconstraint=constraint)
     opsdb.close()
     print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
     return simdata, colmap
@@ -183,7 +223,8 @@ if __name__ == '__main__':
     orbits = readOrbits(args.orbitFile)
 
     # Read opsim data
-    opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint, dbcols=None)
+    opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint,
+                                  footprint=args.footprint, dbcols=None)
 
     # Generate ephemerides.
     runObs(orbits, opsimdata, args, colmap)
