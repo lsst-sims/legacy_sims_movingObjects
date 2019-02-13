@@ -49,22 +49,10 @@ def readOpsim(opsimfile, constraint=None, footprint='camera', dbcols=None):
     if len(failed_cols) > 0:
         print('Could not find columns %s in the database, so leaving those out for now.' % failed_cols)
     for col in failed_cols:
-        more_cols
-    print('Querying for columns:\n %s' % ())
-
+        more_cols.remove(col)
     cols = min_cols + more_cols
     cols = list(set(cols))
-    # See if these additional columns are available.
-    try:
-        simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
-                                      colnames=cols,
-                                      sqlconstraint=constraint,
-                                      numLimit=1)
-    except ValueError:
-        # Exception .. so not all of these columns were available. Reset to 'min_cols'.
-        print('Could not find all of the additional columns in \n%s\n in the database,'
-              'so just querying and using basic set of \n%s.' % (cols, min_cols))
-        cols = min_cols
+    print('Querying for columns:\n %s' % (cols))
 
     # Go ahead and query for all of the observations.
     simdata = opsdb.fetchMetricData(cols, sqlconstraint=constraint)
