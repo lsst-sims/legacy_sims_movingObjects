@@ -497,7 +497,9 @@ class BaseObs(object):
         dmags = np.rec.fromarrays([magFilter, dmagColor, dmagTrail, dmagDetect],
                                   names=['magFilter', 'dmagColor', 'dmagTrail', 'dmagDetect'])
 
-        outCols = ['objId',] + list(objEphs.dtype.names) + list(obsData.dtype.names) + list(dmags.dtype.names)
+        obsDataNames = list(obsData.dtype.names).sort()
+
+        outCols = ['objId',] + list(objEphs.dtype.names) + obsDataNames + list(dmags.dtype.names)
 
         if not self.wroteHeader:
             writestring = ''
