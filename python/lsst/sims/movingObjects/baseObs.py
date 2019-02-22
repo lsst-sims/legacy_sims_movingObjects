@@ -497,7 +497,8 @@ class BaseObs(object):
         dmags = np.rec.fromarrays([magFilter, dmagColor, dmagTrail, dmagDetect],
                                   names=['magFilter', 'dmagColor', 'dmagTrail', 'dmagDetect'])
 
-        obsDataNames = list(obsData.dtype.names).sort()
+        obsDataNames = list(obsData.dtype.names)
+        obsDataNames.sort()
 
         outCols = ['objId',] + list(objEphs.dtype.names) + obsDataNames + list(dmags.dtype.names)
 
