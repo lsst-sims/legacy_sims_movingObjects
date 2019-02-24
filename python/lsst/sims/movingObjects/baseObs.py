@@ -514,7 +514,7 @@ class BaseObs(object):
             writestring = '%s ' %(objId)
             for col in eph.dtype.names:
                 writestring += '%s ' %(eph[col])
-            for col in simdat.dtype.names:
+            for col in obsDataNames:
                 writestring += '%s ' %(simdat[col])
             for col in dm.dtype.names:
                 writestring += '%s ' %(dm[col])
