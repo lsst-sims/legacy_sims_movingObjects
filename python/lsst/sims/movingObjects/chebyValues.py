@@ -55,13 +55,13 @@ class ChebyValues(object):
             cols[k] = [x for x in datacols if x.startswith(k)]
         # Translate dataframe to dictionary of numpy arrays
         # while consolidating RA/Dec/Delta/Vmag/Elongation coeffs.
-        self.coeffs['objId'] = coeffs.objId.as_matrix()
-        self.coeffs['tStart'] = coeffs.tStart.as_matrix()
-        self.coeffs['tEnd'] = coeffs.tEnd.as_matrix()
+        self.coeffs['objId'] = coeffs.objId.values
+        self.coeffs['tStart'] = coeffs.tStart.values
+        self.coeffs['tEnd'] = coeffs.tEnd.values
         for k in coeff_cols:
             self.coeffs[k] = np.empty([len(cols[k]), len(coeffs)], float)
             for i in range(len(cols[k])):
-                self.coeffs[k][i] = coeffs['%s_%d' % (k, i)].as_matrix()
+                self.coeffs[k][i] = coeffs['%s_%d' % (k, i)].values
         # Add the mean RA and Dec columns (before swapping the coefficients axes).
         self.coeffs['meanRA'] = self.coeffs['ra'][0]
         self.coeffs['meanDec'] = self.coeffs['dec'][0]

@@ -1,4 +1,3 @@
-from __future__ import print_function, division
 import os
 import warnings
 import numpy as np
@@ -176,7 +175,7 @@ class ChebyFits(object):
         times = np.arange(self.tStart, self.tEnd + timestep / 2, timestep)
         return times
 
-    def generateEphemerides(self, times, byObject=True, verbose=False):
+    def generateEphemerides(self, times, byObject=True):
         """Generate ephemerides using OpenOrb for all orbits.
 
         Parameters
@@ -186,8 +185,7 @@ class ChebyFits(object):
         """
         return self.pyephems.generateEphemerides(times, obscode=self.obscode,
                                                  ephMode='N', ephType='basic',
-                                                 timeScale=self.timeScale, byObject=byObject,
-                                                 verbose=verbose)
+                                                 timeScale=self.timeScale, byObject=byObject)
 
     def _roundLength(self, length):
         """Modify length, to fit in an 'integer multiple' within the tStart/tEnd,

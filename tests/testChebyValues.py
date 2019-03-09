@@ -116,7 +116,7 @@ class TestChebyValues(unittest.TestCase):
         print('max diff vmag', np.max(resids))
         self.assertLessEqual(np.max(pos_residuals), 2.5)
         # Test for single time, but for a subset of the objects.
-        objIds = self.orbits.orbits.objId.head(3).as_matrix()
+        objIds = self.orbits.orbits.objId.head(3).values
         ephemerides = chebyValues.getEphemerides(time, objIds)
         self.assertEqual(len(ephemerides['ra']), 3)
         # Test for time outside of segment range.
