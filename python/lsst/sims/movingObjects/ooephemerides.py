@@ -1,5 +1,5 @@
-from __future__ import print_function
 import os
+import logging
 from itertools import repeat
 import numpy as np
 import pandas as pd
@@ -39,7 +39,7 @@ class PyOrbEphemerides(object):
         # Note all orbits are assumed to be in TT timescale.
         # Also, all dates are expected to be in MJD.
         self.timeScales = {'UTC': 1, 'UT1': 2, 'TT': 3, 'TAI': 4}
-        self.elemType = {'CART': 1, 'COM': 2, 'KEP': 3, 'DEL': 4, 'EQX': 5}
+        self.elemType = {'CAR': 1, 'COM': 2, 'KEP': 3, 'DEL': 4, 'EQX': 5}
 
         # Set up oorb. Call this once.
         if ephfile is None:
@@ -72,7 +72,7 @@ class PyOrbEphemerides(object):
         The OpenOrb element format is a single array with elemenets:
         0 : orbitId (cannot be a string)
         1-6 : orbital elements, using radians for angles
-        7 : element 'type' code (1 = CART, 2 = COM, 3 = KEP, 4 = DELauny, 5 = EQX (equinoctial))
+        7 : element 'type' code (1 = CAR, 2 = COM, 3 = KEP, 4 = DELauny, 5 = EQX (equinoctial))
         8 : epoch
         9 : timescale for epoch (1 = UTC, 2 = UT1, 3 = TT, 4 = TAI : always assumes TT)
         10 : magHv
@@ -101,7 +101,7 @@ class PyOrbEphemerides(object):
             oorbElem[:, 4] = np.radians(orbitDataframe['Omega'])
             oorbElem[:, 5] = np.radians(orbitDataframe['argPeri'])
             oorbElem[:, 6] = orbitDataframe['tPeri']
-        elif orb_format == 'CART':
+        elif orb_format == 'CAR':
             oorbElem[:, 1] = orbitDataframe['x']
             oorbElem[:, 2] = orbitDataframe['y']
             oorbElem[:, 3] = orbitDataframe['z']
@@ -109,7 +109,7 @@ class PyOrbEphemerides(object):
             oorbElem[:, 5] = orbitDataframe['ydot']
             oorbElem[:, 6] = orbitDataframe['zdot']
         else:
-            raise ValueError('Unknown orbit format %s: should be COM, KEP or CART.' % orb_format)
+            raise ValueError('Unknown orbit format %s: should be COM, KEP or CAR.' % orb_format)
         oorbElem[:,8] = orbitDataframe['epoch']
         oorbElem[:,10] = orbitDataframe['H']
         oorbElem[:,11] = orbitDataframe['g']
@@ -139,12 +139,12 @@ class PyOrbEphemerides(object):
             newOrbits = pd.DataFrame(self.oorbElem, columns=['oorbId', 'q', 'e', 'inc', 'Omega', 'argPeri',
                                                              'tPeri', 'elem_type', 'epoch', 'epoch_type',
                                                              'H', 'g'])
-        elif self.orb_format == 'CART':
+        elif self.orb_format == 'CAR':
             newOrbits = pd.DataFrame(self.oorbElem, columns = ['oorbId', 'x', 'y', 'z',
                                                                'xdot', 'ydot', 'zdot', 'elem_type', 'epoch',
                                                                'epoch_type', 'H', 'g'])
         else:
-            raise ValueError('Unknown orbit format %s: should be COM, KEP or CART.' % self.orb_format)
+            raise ValueError('Unknown orbit format %s: should be COM, KEP or CAR.' % self.orb_format)
         # Convert from radians to degrees.
         if self.orb_format == 'KEP' or self.orb_format =='COM':
             newOrbits['inc'] = np.degrees(newOrbits['inc'])
@@ -158,7 +158,7 @@ class PyOrbEphemerides(object):
         # as well as put back in original SEDs.
         return newOrbits
 
-    def convertOrbitFormat(self, orb_format='CART'):
+    def convertOrbitFormat(self, orb_format='CAR'):
         """Convert orbital elements from the format in orbitObj into 'format'.
 
         Parameters
@@ -386,7 +386,7 @@ class PyOrbEphemerides(object):
         return ephs
 
     def generateEphemerides(self, times, timeScale='UTC', obscode='I11', byObject=True,
-                            ephMode='nbody', ephType='basic', verbose=False):
+                            ephMode='nbody', ephType='basic'):
         """Calculate ephemerides for all orbits at times `times`.
 
         This is a public method, wrapping self._convertTimes, self._generateOorbEphs
@@ -418,8 +418,6 @@ class PyOrbEphemerides(object):
         ephType : str, optional
             Generate full (more data) ephemerides or basic (less data) ephemerides.
             Default basic.
-        verbose: boolean, optional
-            If True, prints time required to calculate ephemerides. Default is False.
 
         Returns
         -------
@@ -444,9 +442,8 @@ class PyOrbEphemerides(object):
         else:
             raise ValueError('ephType must be full or basic')
         dt, t = dtime(t)
-        if verbose:
-            print("# Calculating ephemerides for %d objects over %d times required %f seconds"
-                  % (len(self.oorbElem), len(times), dt))
+        logging.debug("# Calculating ephemerides for %d objects over %d times required %f seconds"
+                      % (len(self.oorbElem), len(times), dt))
         return ephs
 
     def propagateOrbits(self, newEpoch):

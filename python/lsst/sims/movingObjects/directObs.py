@@ -1,4 +1,4 @@
-from __future__ import print_function, division
+import logging
 import numpy as np
 import datetime
 
@@ -121,7 +121,7 @@ class DirectObs(BaseObs):
         timeStart = obsData[self.obsTimeCol].min() - timeStep
         timeEnd = obsData[self.obsTimeCol].max() + timeStep
         rough_times = np.arange(timeStart, timeEnd + timeStep / 2.0, timeStep)
-        print('Generating preliminary ephemerides on a grid of %f day timesteps.' % (timeStep))
+        logging.info('Generating preliminary ephemerides on a grid of %f day timesteps.' % (timeStep))
         # For each object, identify observations where the object is within the FOV (or camera footprint).
         for i, sso in enumerate(orbits):
             objid = sso.orbits['objId'].iloc[0]
@@ -130,7 +130,7 @@ class DirectObs(BaseObs):
             logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + datetime.datetime.now().strftime("Prelim start: %Y-%m-%d %H:%M:%S") + " nRoughTimes: %s" % len(rough_times))
             ephs = self.generateEphemerides(sso, rough_times,
                                             ephMode=self.prelimEphMode, ephType=self.ephType)[0]
-            mu = (ephs['dradt']**2 + ephs['ddecdt']**2)**0.5
+            mu = ephs['velocity']
             logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + datetime.datetime.now().strftime("Prelim end: %Y-%m-%d %H:%M:%S") + " π(median, max), min(geo_dist): %.2f, %.2f deg/day  %.2f AU" % (np.median(mu), np.max(mu), np.min(ephs['geo_dist'])))
             
             # Find observations which come within roughTol of the fov.

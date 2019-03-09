@@ -89,7 +89,7 @@ class TestChebyFits(unittest.TestCase):
         # Test that we can create segments.
         self.cheb.calcSegmentLength(length=1.0)
         times = self.cheb.makeAllTimes()
-        self.cheb.generateEphemerides(times, verbose=False)
+        self.cheb.generateEphemerides(times)
         self.cheb.calcSegments()
         # We expect calculated coefficients to have the following keys:
         coeffKeys = ['objId', 'tStart', 'tEnd', 'ra', 'dec', 'geo_dist', 'vmag', 'elongation']

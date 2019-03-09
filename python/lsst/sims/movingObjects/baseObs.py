@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import warnings
+import datetime
 
 from lsst.utils import getPackageDir
 from lsst.sims.photUtils import Bandpass
@@ -415,6 +416,7 @@ class BaseObs(object):
                 os.makedirs(outDir)
         # Open the output file for writing.
         self.outfile = open(self.outfileName, 'w')
+        self.outfile.write('# Started at %s' % (datetime.datetime.now()))
         # Write metadata into the header, using # to identify as comment lines.
         self.outfile.write('# %s\n' % self.obsMetadata)
         self.outfile.write('# %s\n' % self.outfileName)
@@ -520,3 +522,6 @@ class BaseObs(object):
                 writestring += '%s ' %(dm[col])
             self.outfile.write('%s\n' %(writestring))
         self.outfile.flush()
+
+    def _closeOutput(self):
+        self.outfile.write('# Finished at %s' % (datetime.datetime.now()))
