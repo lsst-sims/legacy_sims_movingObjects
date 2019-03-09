@@ -24,7 +24,7 @@ class Orbits(object):
                                 'tPeri', 'epoch', 'H', 'g', 'sed_filename']
         self.dataCols['KEP'] = ['objId', 'a', 'e', 'inc', 'Omega', 'argPeri',
                                 'meanAnomaly', 'epoch', 'H', 'g', 'sed_filename']
-        self.dataCols['CART'] = ['objId', 'x', 'y', 'z', 'xdot', 'ydot', 'zdot',
+        self.dataCols['CAR'] = ['objId', 'x', 'y', 'z', 'xdot', 'ydot', 'zdot',
                                  'epoch', 'H', 'g', 'sed_filename']
 
     def __len__(self):
@@ -99,10 +99,9 @@ class Orbits(object):
         # Discover which type of orbital parameters we have on disk.
         self.orb_format = None
         if 'FORMAT' in orbits:
+            if ~(orbits['FORMAT'] == orbits['FORMAT'].iloc[0]).all():
+                raise ValueError('All orbital elements in the set should have the same FORMAT.')
             self.orb_format = orbits['FORMAT'].iloc[0]
-            # OOrb files might use CAR instead of CART.
-            if self.orb_format == 'CAR':
-                self.orb_format = 'CART'
             del orbits['FORMAT']
             # Check that the orbit format is approximately right.
             if self.orb_format == 'COM':
@@ -111,9 +110,9 @@ class Orbits(object):
             if self.orb_format == 'KEP':
                 if 'a' not in orbits:
                     raise ValueError('The stated format was KEP, but "a" not present in orbital elements?')
-            if self.orb_format == 'CART':
+            if self.orb_format == 'CAR':
                 if 'x' not in orbits:
-                    raise ValueError('The stated format was CART but "x" not present in orbital elements?')
+                    raise ValueError('The stated format was CAR but "x" not present in orbital elements?')
         if self.orb_format is None:
             # Try to figure out the format, if it wasn't provided.
             if 'q' in orbits:
@@ -121,7 +120,7 @@ class Orbits(object):
             elif 'a' in orbits:
                 self.orb_format = 'KEP'
             elif 'x' in orbits:
-                self.orb_format = 'CART'
+                self.orb_format = 'CAR'
             else:
                 raise ValueError("Can't determine orbital type, as neither q, a or x in input orbital elements.\n"
                                  "Was attempting to base orbital element quantities on header row, "
@@ -207,7 +206,7 @@ class Orbits(object):
 
     def readOrbits(self, orbitfile, delim=None, skiprows=None):
         """Read orbits from a file, generating a pandas dataframe containing columns matching dataCols,
-        for the appropriate orbital parameter format (currently accepts COM, KEP or CAR/CART formats).
+        for the appropriate orbital parameter format (currently accepts COM, KEP or CAR formats).
 
         After reading and standardizing the column names, calls self.setOrbits to validate the
         orbital parameters. Expects angles in orbital element formats to be in degrees.
@@ -237,21 +236,21 @@ class Orbits(object):
             skiprows = -1
             # Figure out whether the header is in the first line, or if there are rows to skip.
             # We need to do a bit of juggling to do this before pandas reads the whole orbit file though.
-            file = open(orbitfile, 'r')
-            headervalues = None
-            for line in file:
-                values = line.split()
-                try:
-                    # If it is a valid orbit line, we expect column 3 to be a number.
-                    float(values[3])
-                    # And if it worked, we're done here (it's an orbit) - go on to parsing header values.
-                    break
-                except (ValueError, IndexError):
-                    # This wasn't a valid number or there wasn't anything in the third value.
-                    # So this is either the header line or it's a comment line before the header columns.
-                    skiprows += 1
-                    headervalues = values
-            file.close()
+            with open(orbitfile, 'r') as fp:
+                headervalues = None
+                for line in fp:
+                    values = line.split()
+                    try:
+                        # If it is a valid orbit line, we expect column 3 to be a number.
+                        float(values[3])
+                        # And if it worked, we're done here (it's an orbit) - go on to parsing header values.
+                        break
+                    except (ValueError, IndexError):
+                        # This wasn't a valid number or there wasn't anything in the third value.
+                        # So this is either the header line or it's a comment line before the header columns.
+                        skiprows += 1
+                        headervalues = values
+
 
             if headervalues is not None:  # (and skiprows > -1)
                 # There is a header, but we also need to check if there is a comment key at the start
@@ -273,14 +272,15 @@ class Orbits(object):
                          'H',  'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
             names_KEP = ('objId', 'FORMAT', 'a', 'e', 'i', 'node', 'argperi', 'meanAnomaly',
                          'H', 'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
-            names_CART = ('objId', 'FORMAT', 'x', 'y', 'z', 'xdot', 'ydot', 'zdot',
+            names_CAR = ('objId', 'FORMAT', 'x', 'y', 'z', 'xdot', 'ydot', 'zdot',
                           'H', 'epoch', 'INDEX', 'N_PAR', 'MOID', 'COMPCODE')
             # First use names_COM, and then change if required.
             orbits = pd.read_csv(orbitfile, delim_whitespace=True, header=None, names=names_COM)
+
             if orbits['FORMAT'][0] == 'KEP':
                 orbits.columns = names_KEP
             elif orbits['FORMAT'][0] == 'CAR' | orbits['FORMAT'][0] == 'CART':
-                orbits.columns = names_CART
+                orbits.columns = names_CAR
 
         else:
             if delim is None:
