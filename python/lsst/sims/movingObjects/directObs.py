@@ -1,4 +1,4 @@
-from __future__ import print_function, division
+import logging
 import numpy as np
 
 from .baseObs import BaseObs
@@ -120,7 +120,7 @@ class DirectObs(BaseObs):
         timeStart = obsData[self.obsTimeCol].min() - timeStep
         timeEnd = obsData[self.obsTimeCol].max() + timeStep
         rough_times = np.arange(timeStart, timeEnd + timeStep / 2.0, timeStep)
-        print('Generating preliminary ephemerides on a grid of %f day timesteps.' % (timeStep))
+        logging.info('Generating preliminary ephemerides on a grid of %f day timesteps.' % (timeStep))
         # For each object, identify observations where the object is within the FOV (or camera footprint).
         for sso in orbits:
             objid = sso.orbits['objId'].iloc[0]
@@ -128,7 +128,7 @@ class DirectObs(BaseObs):
             # Generate ephemerides on the rough grid.
             ephs = self.generateEphemerides(sso, rough_times,
                                             ephMode=self.prelimEphMode, ephType=self.ephType)[0]
-            
+
             # Find observations which come within roughTol of the fov.
             ephsIdxs = np.searchsorted(ephs['time'], obsData[self.obsTimeCol])
             roughIdxObs = self._ssoInCircleFov(ephs[ephsIdxs], obsData, self.roughTol)

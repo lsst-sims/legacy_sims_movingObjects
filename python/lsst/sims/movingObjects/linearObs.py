@@ -1,4 +1,4 @@
-from __future__ import print_function, division
+import logging
 import numpy as np
 from scipy import interpolate
 
@@ -163,8 +163,8 @@ class LinearObs(BaseObs):
         timeStart = obsData[self.obsTimeCol].min() - timeStep
         timeEnd = obsData[self.obsTimeCol].max() + timeStep
         times = np.arange(timeStart, timeEnd + timeStep / 2.0, timeStep)
-        print('Generating ephemerides on a grid of %f day timesteps, then will extrapolate to opsim times.'
-              % (timeStep))
+        logging.info('Generating ephemerides on a grid of %f day timesteps, then will extrapolate '
+                     'to opsim times.' % (timeStep))
         # For each object, identify observations where the object is within the FOV (or camera footprint).
         for sso in orbits:
             objid = sso.orbits['objId'].iloc[0]
