@@ -16,10 +16,6 @@ from lsst.sims.maf.batches import getColMap
 __all__ = ['readOpsim', 'readOrbits', 'runObs', 'setupArgs']
 
 
-# Send info and above logging messages to the console.
-logging.basicConfig(level=logging.INFO)
-
-
 def readOpsim(opsimfile, constraint=None, footprint='camera', dbcols=None):
     """Read the opsim database.
 
@@ -234,6 +230,8 @@ def setupArgs(parser=None):
                              "See https://github.com/lsst/oorb/blob/lsst-dev/python/README.rst for details"
                              "of the contents of 'full' or 'basic' ephemerides. "
                              "Default basic.")
+    parser.add_argument("--logFile", type=str, default=None, 
+                        help="Send log output to logFile, instead of to console. (default = console)")
     args = parser.parse_args()
 
     if args.opsimDb is None:
@@ -264,6 +262,7 @@ def setupArgs(parser=None):
     if args.obsMetadata is not None:
         obsMetadata += '\n# %s' % args.obsMetadata
     args.obsMetadata = obsMetadata
+
     return args
 
 
@@ -271,6 +270,12 @@ if __name__ == '__main__':
 
     # Parser command
     args = setupArgs()
+
+    # Send info and above logging messages to the console or logfile.
+    if args.logFile is not None:
+        logging.basicConfig(filename=args.logFile, level=logging.INFO)
+    else:
+        logging.basicConfig(level=logging.INFO)
 
     # Read orbits.
     orbits = readOrbits(args.orbitFile)
