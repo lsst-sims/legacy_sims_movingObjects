@@ -109,6 +109,10 @@ class TestOrbits(unittest.TestCase):
         self.assertEqual(len(orbits), 4)
         orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsA.des'))
         self.assertEqual(len(orbits), 4)
+        orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsCAR.des'))
+        self.assertEqual(len(orbits), 1)
+        with self.assertRaises(ValueError):
+            orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsBadMix.des'))
         with self.assertRaises(ValueError):
             orbits.readOrbits(os.path.join(self.testdir, 'test_orbitsBad.des'))
 

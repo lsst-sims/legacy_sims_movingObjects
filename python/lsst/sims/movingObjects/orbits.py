@@ -102,6 +102,9 @@ class Orbits(object):
             if ~(orbits['FORMAT'] == orbits['FORMAT'].iloc[0]).all():
                 raise ValueError('All orbital elements in the set should have the same FORMAT.')
             self.orb_format = orbits['FORMAT'].iloc[0]
+            # Backwards compatibility .. a bit. CART is deprecated, so swap it to CAR.
+            if self.orb_format == 'CART':
+                self.orb_format = 'CAR'
             del orbits['FORMAT']
             # Check that the orbit format is approximately right.
             if self.orb_format == 'COM':
@@ -279,7 +282,7 @@ class Orbits(object):
 
             if orbits['FORMAT'][0] == 'KEP':
                 orbits.columns = names_KEP
-            elif orbits['FORMAT'][0] == 'CAR' | orbits['FORMAT'][0] == 'CART':
+            elif orbits['FORMAT'][0] == 'CAR':
                 orbits.columns = names_CAR
 
         else:
