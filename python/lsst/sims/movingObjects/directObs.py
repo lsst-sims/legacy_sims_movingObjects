@@ -131,7 +131,10 @@ class DirectObs(BaseObs):
             ephs = self.generateEphemerides(sso, rough_times,
                                             ephMode=self.prelimEphMode, ephType=self.ephType)[0]
             mu = ephs['velocity']
-            logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + datetime.datetime.now().strftime("Prelim end: %Y-%m-%d %H:%M:%S") + " π(median, max), min(geo_dist): %.2f, %.2f deg/day  %.2f AU" % (np.median(mu), np.max(mu), np.min(ephs['geo_dist'])))
+            logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                          datetime.datetime.now().strftime("Prelim end: %Y-%m-%d %H:%M:%S") + 
+                          " π(median, max), min(geo_dist): %.2f, %.2f deg/day  %.2f AU" 
+                          % (np.median(mu), np.max(mu), np.min(ephs['geo_dist'])))
             
             # Find observations which come within roughTol of the fov.
             ephsIdxs = np.searchsorted(ephs['time'], obsData[self.obsTimeCol])
@@ -139,14 +142,17 @@ class DirectObs(BaseObs):
             if len(roughIdxObs) > 0:
                 # Generate exact ephemerides for these times.
                 times = obsData[self.obsTimeCol][roughIdxObs]
-                logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + datetime.datetime.now().strftime("Exact start: %Y-%m-%d %H:%M:%S") + " nExactTimes: %s" % len(times))
+                logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                              datetime.datetime.now().strftime("Exact start: %Y-%m-%d %H:%M:%S") + 
+                              " nExactTimes: %s" % len(times))
                 ephs = self.generateEphemerides(sso, times, ephMode=self.ephMode, ephType=self.ephType)[0]
-                logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + datetime.datetime.now().strftime("Exact end: %Y-%m-%d %H:%M:%S"))
+                logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                              datetime.datetime.now().strftime("Exact end: %Y-%m-%d %H:%M:%S"))
                 # Identify the objects which fell within the specific footprint.
                 idxObs = self.ssoInFov(ephs, obsData[roughIdxObs])
-                logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + "Object in %d out of %d fields (%.2f%% success rate)" % (len(idxObs), len(times), 100.*float(len(idxObs))/len(times)))
+                logging.info(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                             "Object in %d out of %d fields (%.2f%% success rate)" 
+                             % (len(idxObs), len(times), 100.*float(len(idxObs))/len(times)))
                 # Write these observations to disk.
                 self.writeObs(objid, ephs[idxObs], obsData[roughIdxObs][idxObs], sedname=sedname)
-
-            print("")
 

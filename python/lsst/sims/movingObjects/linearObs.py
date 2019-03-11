@@ -1,4 +1,5 @@
 import logging
+import datetime
 import numpy as np
 from scipy import interpolate
 
@@ -170,11 +171,19 @@ class LinearObs(BaseObs):
             objid = sso.orbits['objId'].iloc[0]
             sedname = sso.orbits['sed_filename'].iloc[0]
             # Generate ephemerides on a grid.
+            logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                          datetime.datetime.now().strftime("Prelim start: %Y-%m-%d %H:%M:%S") + 
+                          " nRoughTimes: %s" % len(rough_times))
             ephs = self.generateEphemerides(sso, times, ephMode=self.ephMode, ephType=self.ephType)[0]
             interpfuncs = self._makeInterps(ephs)
             ephs = self._interpEphs(interpfuncs, times=obsData[self.obsTimeCol], columns=['ra', 'dec'])
+            logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                          datetime.datetime.now().strftime("Interp end: %Y-%m-%d %H:%M:%S"))
             # Find objects in the chosen footprint (circular, rectangular or camera)
             idxObs = self.ssoInFov(ephs, obsData)
+            logging.info(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                         "Object in %d out of %d fields (%.2f%% success rate)" 
+                         % (len(idxObs), len(times), 100.*float(len(idxObs))/len(times)))
             if len(idxObs) > 0:
                 obsdat = obsData[idxObs]
                 ephs = self._interpEphs(interpfuncs, times=obsdat[self.obsTimeCol])
