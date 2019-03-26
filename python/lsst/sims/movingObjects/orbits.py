@@ -157,7 +157,7 @@ class Orbits(object):
                                  % (col, self.orb_format))
 
         # Check to see if we have duplicates.
-        if len(np.unique(orbits['objId'])) != nSso:
+        if len(orbits['objId'].unique()) != nSso:
             warnings.warn('There are duplicates in the orbit objId values' +
                           ' - was this intended? (continuing).')
         # All is good.
