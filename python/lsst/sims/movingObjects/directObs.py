@@ -151,7 +151,7 @@ class DirectObs(BaseObs):
                 # Identify the objects which fell within the specific footprint.
                 idxObs = self.ssoInFov(ephs, obsData[roughIdxObs])
                 logging.info(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
-                             "Object in %d out of %d fields (%.2f%% success rate)" 
+                             "Object in %d out of %d potential fields (%.2f%% success rate)" 
                              % (len(idxObs), len(times), 100.*float(len(idxObs))/len(times)))
                 # Write these observations to disk.
                 self.writeObs(objid, ephs[idxObs], obsData[roughIdxObs][idxObs], sedname=sedname)

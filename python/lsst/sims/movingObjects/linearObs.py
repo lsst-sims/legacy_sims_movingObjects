@@ -167,13 +167,13 @@ class LinearObs(BaseObs):
         logging.info('Generating ephemerides on a grid of %f day timesteps, then will extrapolate '
                      'to opsim times.' % (timeStep))
         # For each object, identify observations where the object is within the FOV (or camera footprint).
-        for sso in orbits:
+        for i, sso in enumerate(orbits):
             objid = sso.orbits['objId'].iloc[0]
             sedname = sso.orbits['sed_filename'].iloc[0]
             # Generate ephemerides on a grid.
             logging.debug(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
-                          datetime.datetime.now().strftime("Prelim start: %Y-%m-%d %H:%M:%S") + 
-                          " nRoughTimes: %s" % len(rough_times))
+                          datetime.datetime.now().strftime("Start: %Y-%m-%d %H:%M:%S") + 
+                          " nTimes: %s" % len(times))
             ephs = self.generateEphemerides(sso, times, ephMode=self.ephMode, ephType=self.ephType)[0]
             interpfuncs = self._makeInterps(ephs)
             ephs = self._interpEphs(interpfuncs, times=obsData[self.obsTimeCol], columns=['ra', 'dec'])
@@ -181,9 +181,8 @@ class LinearObs(BaseObs):
                           datetime.datetime.now().strftime("Interp end: %Y-%m-%d %H:%M:%S"))
             # Find objects in the chosen footprint (circular, rectangular or camera)
             idxObs = self.ssoInFov(ephs, obsData)
-            logging.info(("%d/%d   id=%s : " % (i, len(orbits), objid)) + 
-                         "Object in %d out of %d fields (%.2f%% success rate)" 
-                         % (len(idxObs), len(times), 100.*float(len(idxObs))/len(times)))
+            logging.info(("Object %d/%d   id=%s : " % (i, len(orbits), objid)) + 
+                         "Object in %d visits" % (len(idxObs)))
             if len(idxObs) > 0:
                 obsdat = obsData[idxObs]
                 ephs = self._interpEphs(interpfuncs, times=obsdat[self.obsTimeCol])
