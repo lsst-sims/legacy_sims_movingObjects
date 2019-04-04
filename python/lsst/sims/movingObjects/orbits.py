@@ -86,6 +86,9 @@ class Orbits(object):
         elif isinstance(orbits, np.record):
             # This was a single object in a numpy array and we should be a bit fancy.
             orbits = pd.DataFrame.from_records([orbits], columns=orbits.dtype.names)
+        elif isinstance(orbits, pd.DataFrame):
+            # This was a pandas dataframe .. but we probably want to drop the index and recount.
+            orbits = orbits.drop_index(drop=True)
 
         if 'index' in orbits:
             del orbits['index']
@@ -142,13 +145,14 @@ class Orbits(object):
 
         # If these columns are not available in the input data, auto-generate them.
         if 'objId' not in orbits:
-            orbits['objId'] = np.arange(0, nSso, 1)
+            objId = np.arange(0, nSso, 1)
+            orbits = orbits.assign(objId = objId)
         if 'H' not in orbits:
-            orbits['H'] = np.zeros(nSso) + 20.0
+            orbits = orbits.assign(H = 20.0)
         if 'g' not in orbits:
-            orbits['g'] = np.zeros(nSso) + 0.15
+            orbits = orbits.assign(g = 0.15)
         if 'sed_filename' not in orbits:
-            orbits['sed_filename'] = self.assignSed(orbits)
+            orbits = orbits.assign(sed_filename = self.assignSed(orbits))
 
         # Make sure we gave all the columns we need.
         for col in self.dataCols[self.orb_format]:
@@ -354,8 +358,8 @@ class Orbits(object):
         ----------
         neworb: pandas.DataFrame
         """
-        col_orig = ['objId', 'otype', 'model', 'H', 'g', 'sed_filename']
-        new_order = ['objId', 'otype'] + [n for n in neworb.columns] + ['H', 'g', 'model', 'sed_filename']
+        col_orig = ['objId', 'sed_filename']
+        new_order = ['objId'] + [n for n in neworb.columns] + ['sed_filename']
         updated_orbits = neworb.join(self.orbits[col_orig])[new_order]
         self.setOrbits(updated_orbits)
 
