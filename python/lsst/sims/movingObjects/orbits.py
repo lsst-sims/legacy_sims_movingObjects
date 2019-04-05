@@ -46,9 +46,7 @@ class Orbits(object):
             if self.orb_format != otherOrbits.orb_format:
                 return False
             for col in self.dataCols[self.orb_format]:
-                if col == 'objId':
-                    continue
-                if not self.orbits[col].equals(otherOrbits.orbits[col]):
+                if not np.all(self.orbits[col].values == otherOrbits.orbits[col].values):
                     return False
                 else:
                     return True
@@ -88,7 +86,7 @@ class Orbits(object):
             orbits = pd.DataFrame.from_records([orbits], columns=orbits.dtype.names)
         elif isinstance(orbits, pd.DataFrame):
             # This was a pandas dataframe .. but we probably want to drop the index and recount.
-            orbits = orbits.drop_index(drop=True)
+            orbits.reset_index(drop=True, inplace=True)
 
         if 'index' in orbits:
             del orbits['index']
