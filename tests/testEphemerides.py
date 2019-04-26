@@ -59,11 +59,12 @@ class TestPyOrbEphemerides(unittest.TestCase):
         self.assertEqual(self.ephems.oorbElem[0][1], self.orbitsKEP.orbits['a'][0])
 
     def testConvertFromOorbArray(self):
+        # Check that we can convert orbital elements TO oorb format and back
+        # without losing info (except ObjId -- we will lose that unless we use updateOrbits.)
         self.ephems._convertToOorbElem(self.orbits.orbits, self.orbits.orb_format)
         newOrbits = Orbits()
-        newOrbits.setOrbits(self.ephems.convertFromOorbElem())
-        print(self.orbits.orb_format, self.orbits.orbits)
-        print(newOrbits.orb_format, newOrbits.orbits)
+        newOrbits.setOrbits(self.orbits.orbits)
+        newOrbits.updateOrbits(self.ephems.convertFromOorbElem())
         self.assertEqual(newOrbits, self.orbits)
 
     def testConvertTimes(self):
@@ -100,6 +101,7 @@ class TestPyOrbEphemerides(unittest.TestCase):
         ephs = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=True)
         self.assertEqual(len(ephs), len(self.orbits))
         # Group by time, and check grouping.
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807)
         ephs = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=False)
         self.assertEqual(len(ephs), len(times))
         # And test all-wrapped-up method:
@@ -109,9 +111,10 @@ class TestPyOrbEphemerides(unittest.TestCase):
         np.testing.assert_equal(ephsAll, ephs)
         # Reset ephems to use KEP Orbits, and calculate new ephemerides.
         self.ephems.setOrbits(self.orbitsKEP)
-        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807)
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807, ephMode='N')
         ephsKEP = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=True)
         self.assertEqual(len(ephsKEP), len(self.orbitsKEP))
+        oorbEphs = self.ephems._generateOorbEphsBasic(ephTimes, obscode=807, ephMode='N')
         ephsKEP = self.ephems._convertOorbEphsBasic(oorbEphs, byObject=False)
         self.assertEqual(len(ephsKEP), len(times))
         # And test all-wrapped-up method:
@@ -162,8 +165,8 @@ class TestJPLValues(unittest.TestCase):
             ephems.setOrbits(subOrbits)
             ephs = ephems.generateEphemerides([t], timeScale='UTC', obscode=807,
                                               ephMode='N', ephType='Basic', byObject=False)
-            deltaRA[i] = np.abs(ephs['ra'] - j['ra_deg'].as_matrix()).max()
-            deltaDec[i] = np.abs(ephs['dec'] - j['dec_deg'].as_matrix()).max()
+            deltaRA[i] = np.abs(ephs['ra'] - j['ra_deg'].values).max()
+            deltaDec[i] = np.abs(ephs['dec'] - j['dec_deg'].values).max()
         # Convert to mas
         deltaRA *= 3600. * 1000.
         deltaDec *= 3600. * 1000.

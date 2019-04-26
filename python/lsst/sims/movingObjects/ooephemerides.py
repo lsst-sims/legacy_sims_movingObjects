@@ -82,6 +82,7 @@ class PyOrbEphemerides(object):
         """
         oorbElem = np.zeros([len(orbitDataframe), 12], dtype=np.double, order='F')
         # Put in simple values for objid, or add method to test if any objId is a string.
+        # NOTE THAT THIS MEANS WE'VE LOST THE OBJID
         oorbElem[:,0] = np.arange(0, len(orbitDataframe), dtype=int) + 1
         # Add the appropriate element and epoch types:
         oorbElem[:,7] = np.zeros(len(orbitDataframe), float) + self.elemType[orb_format]
@@ -431,19 +432,23 @@ class PyOrbEphemerides(object):
         else:
             raise ValueError("ephMode should be 2body or nbody (or '2' or 'N').")
 
-        t = time.time()
+        #t = time.time()
         ephTimes = self._convertTimes(times, timeScale=timeScale)
         if ephType.lower() == 'basic':
-            oorbEphs = self._generateOorbEphsBasic(ephTimes, obscode=obscode, ephMode=ephMode)
+            #oorbEphs = self._generateOorbEphsBasic(ephTimes, obscode=obscode, ephMode=ephMode)
+            oorbEphs, err = oo.pyoorb.oorb_ephemeris_basic(in_orbits=self.oorbElem,
+                                                             in_obscode=obscode,
+                                                             in_date_ephems=ephTimes,
+                                                             in_dynmodel=ephMode)
             ephs = self._convertOorbEphsBasic(oorbEphs, byObject=byObject)
         elif ephType.lower() == 'full':
             oorbEphs = self._generateOorbEphsFull(ephTimes, obscode=obscode, ephMode=ephMode)
             ephs = self._convertOorbEphsFull(oorbEphs, byObject=byObject)
         else:
             raise ValueError('ephType must be full or basic')
-        dt, t = dtime(t)
-        logging.debug("# Calculating ephemerides for %d objects over %d times required %f seconds"
-                      % (len(self.oorbElem), len(times), dt))
+        #dt, t = dtime(t)
+        #logging.debug("# Calculating ephemerides for %d objects over %d times required %f seconds"
+        #              % (len(self.oorbElem), len(times), dt))
         return ephs
 
     def propagateOrbits(self, newEpoch):
