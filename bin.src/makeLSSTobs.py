@@ -12,7 +12,8 @@ from lsst.sims.movingObjects import DirectObs
 from lsst.sims.maf.db import OpsimDatabase
 from lsst.sims.maf.batches import getColMap
 
-from lsst.sims.movingObjects import version
+from lsst.sims.movingObjects import version as smo_version
+from lsst.sims.maf import version as maf_version
 
 __all__ = ['readOpsim', 'readOrbits', 'runObs', 'setupArgs']
 
@@ -278,7 +279,10 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(level=logging.INFO)
 
-    logging.info('# sims_movingObjects version %s (%s)' % (version.__version__, version.__fingerprint__))
+    logging.info('# sims_movingObjects version %s (%s)' % (smo_version.__version__,
+                                                           smo_version.__fingerprint__))
+    logging.info('# sims_maf version: %s (%s)' % (maf_version.__version__,
+                                                  maf_version.__fingerprint__))
 
     # Read orbits.
     orbits = readOrbits(args.orbitFile)
