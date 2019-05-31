@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import warnings
+import datetime
 
 from lsst.utils import getPackageDir
 from lsst.sims.photUtils import Bandpass
@@ -415,6 +416,7 @@ class BaseObs(object):
                 os.makedirs(outDir)
         # Open the output file for writing.
         self.outfile = open(self.outfileName, 'w')
+        self.outfile.write('# Started at %s' % (datetime.datetime.now()))
         # Write metadata into the header, using # to identify as comment lines.
         self.outfile.write('# %s\n' % self.obsMetadata)
         self.outfile.write('# %s\n' % self.outfileName)
@@ -497,7 +499,10 @@ class BaseObs(object):
         dmags = np.rec.fromarrays([magFilter, dmagColor, dmagTrail, dmagDetect],
                                   names=['magFilter', 'dmagColor', 'dmagTrail', 'dmagDetect'])
 
-        outCols = ['objId',] + list(objEphs.dtype.names) + list(obsData.dtype.names) + list(dmags.dtype.names)
+        obsDataNames = list(obsData.dtype.names)
+        obsDataNames.sort()
+
+        outCols = ['objId',] + list(objEphs.dtype.names) + obsDataNames + list(dmags.dtype.names)
 
         if not self.wroteHeader:
             writestring = ''
@@ -511,9 +516,12 @@ class BaseObs(object):
             writestring = '%s ' %(objId)
             for col in eph.dtype.names:
                 writestring += '%s ' %(eph[col])
-            for col in simdat.dtype.names:
+            for col in obsDataNames:
                 writestring += '%s ' %(simdat[col])
             for col in dm.dtype.names:
                 writestring += '%s ' %(dm[col])
             self.outfile.write('%s\n' %(writestring))
         self.outfile.flush()
+
+    def _closeOutput(self):
+        self.outfile.write('# Finished at %s' % (datetime.datetime.now()))

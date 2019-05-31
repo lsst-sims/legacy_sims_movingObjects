@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
 import os
 import argparse
+import logging
 import numpy as np
 
 from lsst.sims.movingObjects import Orbits
@@ -12,32 +12,97 @@ from lsst.sims.movingObjects import DirectObs
 from lsst.sims.maf.db import OpsimDatabase
 from lsst.sims.maf.batches import getColMap
 
+from lsst.sims.movingObjects import version as smo_version
+from lsst.sims.maf import version as maf_version
 
-def readOpsim(opsimfile, constraint=None, dbcols=None):
+__all__ = ['readOpsim', 'readOrbits', 'runObs', 'setupArgs']
+
+
+def readOpsim(opsimfile, constraint=None, footprint='camera', dbcols=None):
+    """Read the opsim database.
+
+    Parameters
+    ----------
+    opsimfile: str
+        Name (& path) of the opsim database file.
+    constraint: str, opt
+        Optional SQL constraint (minus 'where') on the opsim data to read from db.
+        Default is None.
+    footprint: str, opt
+        Footprint option for the final matching of object against OpSim FOV.
+        Default 'camera' means that 'rotSkyPos' must be fetched from the db.
+        Any other value will not require rotSkyPos.
+    dbcols: list of str, opt
+        List of additional columns to query from the db and add to the output observations.
+        Default None.
+
+    Returns
+    -------
+    np.ndarray, dictionary
+        The OpSim data read from the database, and the dictionary mapping the column names to the data.
+    """
     # Read opsim database.
     opsdb = OpsimDatabase(opsimfile)
-    if dbcols is None:
-        dbcols = []
+
     colmap = getColMap(opsdb)
     if 'rotSkyPos' not in colmap:
         colmap['rotSkyPos'] = 'rotSkyPos'
-    reqcols = [colmap['mjd'], colmap['night'], colmap['ra'], colmap['dec'],
-               colmap['rotSkyPos'], colmap['filter'], colmap['exptime'], colmap['seeingEff'],
-               colmap['seeingGeom'], colmap['fiveSigmaDepth'], 'solarElong']
-    for col in reqcols:
-        if col not in dbcols:
-            dbcols.append(col)
-    simdata = opsdb.fetchMetricData(dbcols, sqlconstraint=constraint)
+
+    # Set the minimum required columns.
+    min_cols = [colmap['mjd'], colmap['night'], colmap['ra'], colmap['dec'],
+                colmap['filter'], colmap['exptime'], colmap['seeingGeom'],
+                colmap['fiveSigmaDepth']]
+    if footprint == 'camera':
+        min_cols.append(colmap['rotSkyPos'])
+    if dbcols is not None:
+        min_cols += dbcols
+    min_cols = list(set(min_cols))
+
+    # Check if these minimum required columns are in the database.
+    simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
+                                  colnames=min_cols,
+                                  sqlconstraint=constraint,
+                                  numLimit=1)
+
+    # If that was successful, there are some additional columns that can be useful:
+    more_cols = [colmap['rotSkyPos'], colmap['seeingEff'], 'solarElong']
+    failed_cols = []
+    for col in more_cols:
+        try:
+            simdata = opsdb.query_columns(tablename=opsdb.defaultTable,
+                                          colnames=[col], sqlconstraint=constraint, numLimit=1)
+        except ValueError:
+            failed_cols.append(col)
+    for col in failed_cols:
+        more_cols.remove(col)
+    cols = min_cols + more_cols
+    cols = list(set(cols))
+    logging.info('Querying for columns:\n %s' % (cols))
+
+    # Go ahead and query for all of the observations.
+    simdata = opsdb.fetchMetricData(cols, sqlconstraint=constraint)
     opsdb.close()
-    print("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
+    logging.info("Queried data from opsim %s, fetched %d visits." % (opsimfile, len(simdata)))
     return simdata, colmap
 
 def readOrbits(orbitfile):
+    """Read the orbits from the orbitfile.
+
+    Parameters
+    ----------
+    orbitfile: str
+        Name (and path) of the orbit file.
+
+    Returns
+    -------
+    lsst.sims.movingObjects.Orbits
+        The orbit object.
+    """
     if not os.path.isfile(orbitfile):
-        print("Could not find orbit file %s" % (orbitfile))
+        logging.critical("Could not find orbit file %s" % (orbitfile))
     orbits = Orbits()
     orbits.readOrbits(orbitfile)
-    print("Read orbit information from %s" % (orbitfile))
+    logging.info("Read orbit information from %s" % (orbitfile))
     return orbits
 
 def _setupColors(obs, filterlist, orbits):
@@ -50,6 +115,19 @@ def _setupColors(obs, filterlist, orbits):
     return obs
 
 def runObs(orbits, simdata, args, colmap):
+    """Generate the observations.
+
+    Parameters
+    ----------
+    orbits: lsst.sims.movingObjects.Orbit
+        Orbits for which to calculate observations
+    simdata: np.ndarray
+        The simulated pointing history data from OpSim
+    args: argparse.Namespace
+        Arguments from the command line script parser.
+    colmap: dict
+        Dictionary of the column mappings (from column names here to opsim columns).
+    """
     if args.obsType.lower() == 'linear':
         print("Using linear interpolation: ")
         obs = LinearObs(footprint = args.footprint, rFov = args.rFov,
@@ -82,6 +160,19 @@ def runObs(orbits, simdata, args, colmap):
 
 
 def setupArgs(parser=None):
+    """Parse the command line arguments.
+
+    Parameters
+    ----------
+    parser: argparse.ArgumentParser, opt
+        Generally left at the default (None), but a user could set up their own parser if desired.
+
+    Returns
+    -------
+    argparse.Namespace
+        The argument options.
+    """
+
     if parser is None:
         parser = argparse.ArgumentParser(description="Generate moving object detections.")
     parser.add_argument("--opsimDb", type=str, default=None,
@@ -141,6 +232,8 @@ def setupArgs(parser=None):
                              "See https://github.com/lsst/oorb/blob/lsst-dev/python/README.rst for details"
                              "of the contents of 'full' or 'basic' ephemerides. "
                              "Default basic.")
+    parser.add_argument("--logFile", type=str, default=None, 
+                        help="Send log output to logFile, instead of to console. (default = console)")
     args = parser.parse_args()
 
     if args.opsimDb is None:
@@ -171,6 +264,7 @@ def setupArgs(parser=None):
     if args.obsMetadata is not None:
         obsMetadata += '\n# %s' % args.obsMetadata
     args.obsMetadata = obsMetadata
+
     return args
 
 
@@ -179,11 +273,25 @@ if __name__ == '__main__':
     # Parser command
     args = setupArgs()
 
+    # Send info and above logging messages to the console or logfile.
+    if args.logFile is not None:
+        logging.basicConfig(filename=args.logFile, level=logging.INFO)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    logging.info('# sims_movingObjects version %s (%s)' % (smo_version.__version__,
+                                                           smo_version.__fingerprint__))
+    logging.info('# sims_maf version: %s (%s)' % (maf_version.__version__,
+                                                  maf_version.__fingerprint__))
+
     # Read orbits.
     orbits = readOrbits(args.orbitFile)
 
     # Read opsim data
-    opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint, dbcols=None)
+    opsimdata, colmap = readOpsim(args.opsimDb, constraint=args.sqlConstraint,
+                                  footprint=args.footprint, dbcols=None)
 
     # Generate ephemerides.
     runObs(orbits, opsimdata, args, colmap)
+
+    logging.info('Completed successfully.')
