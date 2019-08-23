@@ -131,17 +131,17 @@ class PyOrbEphemerides(object):
             A DataFrame with the appropriate subset of columns relating to orbital elements.
         """
         if self.orb_format == 'KEP':
-            newOrbits = pd.DataFrame(self.oorbElem, columns=['oorbId', 'a', 'e', 'inc', 'Omega', 'argPeri',
+            newOrbits = pd.DataFrame(self.oorbElem.copy(), columns=['oorbId', 'a', 'e', 'inc', 'Omega', 'argPeri',
                                                              'meanAnomaly', 'elem_type', 'epoch',
                                                              'epoch_type',
                                                              'H', 'g'])
             newOrbits['meanAnomaly'] = np.degrees(newOrbits['meanAnomaly'])
         elif self.orb_format == 'COM':
-            newOrbits = pd.DataFrame(self.oorbElem, columns=['oorbId', 'q', 'e', 'inc', 'Omega', 'argPeri',
+            newOrbits = pd.DataFrame(self.oorbElem.copy(), columns=['oorbId', 'q', 'e', 'inc', 'Omega', 'argPeri',
                                                              'tPeri', 'elem_type', 'epoch', 'epoch_type',
                                                              'H', 'g'])
         elif self.orb_format == 'CAR':
-            newOrbits = pd.DataFrame(self.oorbElem, columns = ['oorbId', 'x', 'y', 'z',
+            newOrbits = pd.DataFrame(self.oorbElem.copy(), columns = ['oorbId', 'x', 'y', 'z',
                                                                'xdot', 'ydot', 'zdot', 'elem_type', 'epoch',
                                                                'epoch_type', 'H', 'g'])
         else:
@@ -451,7 +451,7 @@ class PyOrbEphemerides(object):
         #              % (len(self.oorbElem), len(times), dt))
         return ephs
 
-    def propagateOrbits(self, newEpoch):
+    def propagateOrbits(self, newEpoch, ephMode='nbody'):
         """Propagate orbits from self.orbits.epoch to new epoch (MJD TT).
 
         Parameters
@@ -460,7 +460,16 @@ class PyOrbEphemerides(object):
             MJD TT time for new epoch.
         """
         newEpoch = self._convertTimes(newEpoch, timeScale='TT')
-        newOorbElem, err = oo.pyoorb.oorb_propagation_nb(in_orbits=self.oorbElem, in_epoch=newEpoch)
+        if ephMode.lower() in ('nbody', 'n'):
+            ephMode = 'N'
+        elif ephMode.lower() in ('2body', '2'):
+            ephMode = '2'
+        else:
+            raise ValueError("ephMode should be 2body or nbody (or '2' or 'N').")
+
+        newOorbElem, err = oo.pyoorb.oorb_propagation(in_orbits=self.oorbElem, 
+                                                      in_dynmodel=ephMode, 
+                                                      in_epoch=newEpoch)
         if err != 0:
             raise RuntimeError('Orbit propagation returned error %d' % err)
         self.oorbElem = newOorbElem
