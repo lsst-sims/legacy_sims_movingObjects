@@ -139,7 +139,7 @@ class TestJPLValues(unittest.TestCase):
         self.jplDir = os.path.join(getPackageDir('sims_movingObjects'), 'tests/jpl_testdata')
         self.orbits.readOrbits(os.path.join(self.jplDir, 'S0_n747.des'), skiprows=1)
         # Read JPL ephems.
-        self.jpl = pd.read_table(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)
+        self.jpl = pd.read_csv(os.path.join(self.jplDir, '807_n747.txt'), delim_whitespace=True)
         # Add times in TAI and UTC, because.
         t = Time(self.jpl['epoch_mjd'], format='mjd', scale='utc')
         self.jpl['mjdTAI'] = t.tai.mjd
