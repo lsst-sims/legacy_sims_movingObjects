@@ -490,14 +490,13 @@ class BaseObs(object):
                 raise UserWarning('Could not find filter %s in calculated colors!' %(f))
             match = np.where(obsData['filter'] == f)[0]
             dmagColor[match] = dmagColorDict[f]
-        magFilter = objEphs['magV'] + dmagColor
         # Calculate trailing and detection loses.
         dmagTrail, dmagDetect = self.calcTrailingLosses(objEphs['velocity'],
                                                         obsData[self.seeingCol],
                                                         obsData[self.visitExpTimeCol])
         # Turn into a recarray so it's easier below.
-        dmags = np.rec.fromarrays([magFilter, dmagColor, dmagTrail, dmagDetect],
-                                  names=['magFilter', 'dmagColor', 'dmagTrail', 'dmagDetect'])
+        dmags = np.rec.fromarrays([dmagColor, dmagTrail, dmagDetect],
+                                  names=['dmagColor', 'dmagTrail', 'dmagDetect'])
 
         obsDataNames = list(obsData.dtype.names)
         obsDataNames.sort()
