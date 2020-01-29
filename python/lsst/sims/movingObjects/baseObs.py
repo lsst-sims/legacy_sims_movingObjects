@@ -11,7 +11,7 @@ from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
 from lsst.sims.coordUtils import lsst_camera
 from lsst.sims.coordUtils import chipNameFromRaDecLSST
-from lsst.afw.cameraGeom import SCIENCE, WAVEFRONT, GUIDER, FOCUS
+from lsst.afw.cameraGeom import DetectorType
 
 from .ooephemerides import PyOrbEphemerides
 
@@ -114,8 +114,8 @@ class BaseObs(object):
 
     def _setupCamera(self):
         self.camera = lsst_camera()
-        self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
-                              GUIDER: 'guider', FOCUS: 'focus'}
+        self.ccd_type_dict = {DetectorType.SCIENCE: 'science', DetectorType.WAVEFRONT: 'wavefront',
+                              DetectorType.GUIDER: 'guider', DetectorType.FOCUS: 'focus'}
 
     def setupEphemerides(self):
         """Initialize the ephemeris generator. Save the setup PyOrbEphemeris class.

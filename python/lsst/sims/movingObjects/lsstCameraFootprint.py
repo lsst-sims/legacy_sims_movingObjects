@@ -7,7 +7,7 @@ from lsst.sims.utils import ObservationMetaData
 from lsst.obs.lsstSim import LsstSimMapper
 from lsst.sims.coordUtils import lsst_camera
 from lsst.sims.coordUtils import chipNameFromRaDecLSST
-from lsst.afw.cameraGeom import SCIENCE, WAVEFRONT, GUIDER, FOCUS
+from lsst.afw.cameraGeom import DetectorType
 
 __all__ = ['LsstCameraFootprint']
 
@@ -18,8 +18,8 @@ class LsstCameraFootprint(object):
     """
     def __init__(self):
         self.camera = lsst_camera()
-        self.ccd_type_dict = {SCIENCE: 'science', WAVEFRONT: 'wavefront',
-                              GUIDER: 'guider', FOCUS: 'focus'}
+        self.ccd_type_dict = {DetectorType.SCIENCE: 'science', DetectorType.WAVEFRONT: 'wavefront',
+                              DetectorType.GUIDER: 'guider', DetectorType.FOCUS: 'focus'}
 
 
     def inCameraFov(self, ephems, obsData, epoch=2000.0, timeCol='observationStartMJD'):
