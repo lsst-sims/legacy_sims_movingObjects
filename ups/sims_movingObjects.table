@@ -1,9 +1,6 @@
 setupRequired(base)
 setupRequired(utils)
-setupRequired(numpy)
-setupRequired(pandas)
 setupRequired(oorb)
-setupRequired(astropy)
 
 setupRequired(throughputs)
 setupRequired(sims_photUtils)
