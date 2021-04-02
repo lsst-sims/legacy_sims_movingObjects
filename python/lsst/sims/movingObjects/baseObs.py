@@ -9,8 +9,8 @@ from lsst.sims.photUtils import Sed
 from lsst.sims.utils import angularSeparation
 from lsst.sims.utils import ModifiedJulianDate
 from lsst.sims.utils import ObservationMetaData
-from lsst.sims.coordUtils import lsst_camera
-from lsst.sims.coordUtils import chipNameFromRaDecLSST
+from lsst.obs.lsst.phosim import PhosimMapper
+from lsst.sims.coordUtils import chipNameFromRaDec
 from lsst.afw.cameraGeom import DetectorType
 
 from .ooephemerides import PyOrbEphemerides
@@ -113,7 +113,7 @@ class BaseObs(object):
             self.obsMetadata = obsMetadata
 
     def _setupCamera(self):
-        self.camera = lsst_camera()
+        self.camera = PhosimMapper().camera
         self.ccd_type_dict = {DetectorType.SCIENCE: 'science', DetectorType.WAVEFRONT: 'wavefront',
                               DetectorType.GUIDER: 'guider', DetectorType.FOCUS: 'focus'}
 
@@ -372,9 +372,9 @@ class BaseObs(object):
             # Catch the warnings from astropy about the time being in the future.
             with warnings.catch_warnings(record=False):
                 warnings.simplefilter('ignore')
-                chipName = chipNameFromRaDecLSST(ra=ephems['ra'][idx], dec=ephems['dec'][idx],
-                                                 epoch=epoch, obs_metadata=obs_metadata)
-            if chipName != None:
+                chipName = chipNameFromRaDec(ra=ephems['ra'][idx], dec=ephems['dec'][idx],
+                                                 epoch=epoch, obs_metadata=obs_metadata, camera=self.camera)
+            if chipName is not None:
                 tt = self.ccd_type_dict[self.camera[chipName].getType()]
                 if tt == 'science':
                     idxObs.append(idx)
