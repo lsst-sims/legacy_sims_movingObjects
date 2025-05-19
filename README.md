@@ -1,3 +1,5 @@
+Moved to [rubin_sim](github.com/lsst/rubin_sim)
+
 # sims_movingObjects
 
 [Documentation](https://epyc.astro.washington.edu/~lynnej/sims_movingObjects/) 
